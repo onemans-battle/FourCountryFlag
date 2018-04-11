@@ -461,7 +461,7 @@ namespace Server
             //    Connector.PushMsgByChannel(Channel, pReC);
             //};
             #endregion
-
+            
             //room.Gamemanager.PlayerReady += (sender, e) =>
             //{
 

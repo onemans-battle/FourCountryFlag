@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27130.2027
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FourCountryFlag", "四国军旗\FourCountryFlag.csproj", "{1434F9E4-E704-4CCD-A0E7-623B2DA35881}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "四国军旗类库", "四国军旗\四国军旗类库.csproj", "{1434F9E4-E704-4CCD-A0E7-623B2DA35881}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FourCountryFlagTests", "四国军旗Tests\FourCountryFlagTests.csproj", "{76573A5B-5430-4228-8857-5AE5CF236CB8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "四国军旗类库Tests", "四国军旗Tests\四国军旗类库Tests.csproj", "{76573A5B-5430-4228-8857-5AE5CF236CB8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UI", "UI\UI.csproj", "{B9FBC725-EE83-41A0-B6B6-823EDB779EFA}"
 EndProject
