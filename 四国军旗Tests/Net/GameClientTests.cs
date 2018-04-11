@@ -38,7 +38,7 @@ namespace NetConnector.Tests
                 gcList[i].TcpClient.Close();
 
             }
-
+            ; ;
             //gc.MsgReceived += (sender, msg) =>
             //{
 

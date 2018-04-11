@@ -462,133 +462,133 @@ namespace Server
             //};
             #endregion
 
-            room.Gamemanager.PlayerReady += (sender, e) =>
-            {
+            //room.Gamemanager.PlayerReady += (sender, e) =>
+            //{
 
-                foreach (var item in room.PlayersInfo)
-                {
-                    GameManager.FuzzifyLayout(ref e.CheLayout, e.Side, item.Side, room.Gamemanager.Mode);
-                    PReady pReady = new PReady()
-                    {
-                        RoomID = room.ID,
-                        PlayerInfo = Room.SearchInfoBySide(e.Side,room),
-                        CheLayout = e.CheLayout
-                    };
-                    _connector.PushMsgByUID(item.UID, pReady);
-                }
+            //    foreach (var item in room.PlayersInfo)
+            //    {
+            //        GameManager.FuzzifyLayout(ref e.CheLayout, e.Side, item.Side, room.Gamemanager.Mode);
+            //        PReady pReady = new PReady()
+            //        {
+            //            RoomID = room.ID,
+            //            PlayerInfo = Room.SearchInfoBySide(e.Side,room),
+            //            CheLayout = e.CheLayout
+            //        };
+            //        _connector.PushMsgByUID(item.UID, pReady);
+            //    }
 
-            };
-            Gamemanager.PlayerChessMove += (sender, e) =>
-            {
-                PMove pMove = new PMove()
-                {
-                    RoomID = ID,
-                    PlayerInfo = _searchInfoBySide(e.Side),
-                    SMInfo = e
-                };
-                Connector.PushMsgByChannel(Channel, pMove);
-            };
-            Gamemanager.PlayerDie += (sender, side) =>
-            {
-                PDie pDie = new PDie()
-                {
-                    RoomID = ID,
-                    Player = _searchInfoBySide(side),
-                };
-                Connector.PushMsgByChannel(Channel, pDie);
-            };
-            Gamemanager.PlayerMoveSkip += (sender, side) =>
-            {
-                PSkip pSkip = new PSkip()
-                {
-                    RoomID = ID,
-                    PlayerInfo = _searchInfoBySide(side)
-                };
-                Connector.PushMsgByChannel(Channel, pSkip);
-            };
-            Gamemanager.PlayerSurrender += (sender, e) =>
-            {
-                PSurr pSurr = new PSurr()
-                {
-                    RoomID = ID,
-                    PlayerInfo = _searchInfoBySide(e.Side),
-                    Steps = e.Steps
-                };
-                Connector.PushMsgByChannel(Channel, pSurr);
-            };
-            Gamemanager.PlayerOfferDraw += (sender, side) =>
-            {
-                PODraw pODraw = new PODraw()
-                {
-                    RoomID = ID,
-                    PlayerInfo = _searchInfoBySide(side),
-                };
-                Connector.PushMsgByChannel(Channel, pODraw);
-            };
-            Gamemanager.PlayerAgrreDraw += (sender, side) => {
-                PADraw pADraw = new PADraw()
-                {
-                    RoomID = ID,
-                    PlayerInfo = _searchInfoBySide(side),
-                };
-                Connector.PushMsgByChannel(Channel, pADraw);
-            };
-            Gamemanager.PlayerRefuseDraw += (sender, e) =>
-            {
-                PRDraw pRDraw = new PRDraw()
-                {
-                    RoomID = ID,
-                    PlayerInfo = _searchInfoBySide(e.Side),
-                    DRecord = e.DrawRecord
-                };
-                Connector.PushMsgByChannel(Channel, pRDraw);
-            };
-            Gamemanager.ExpireDraw += (sender, record) =>
-            {
-                ExpireDraw expireDraw = new ExpireDraw()
-                {
-                    RoomID = ID,
-                    DRecord = record
-                };
-                Connector.PushMsgByChannel(Channel, expireDraw);
-            };
-            Gamemanager.PlayerSiLingDied += (sender, chelist) =>
-            {
-                PSiLingDied pSiLingDied = new PSiLingDied()
-                {
-                    RoomID = ID,
-                    PlayerInfo = _searchInfoBySide(chelist[0].chess.Side),
-                    chessInfo = chelist
-                };
-                Connector.PushMsgByChannel(Channel, pSiLingDied);
-            };
-            Gamemanager.SideNext += (sender, side) =>
-            {
-                SideNext sideNext = new SideNext()
-                {
-                    RoomID = ID,
-                    Steps = Gamemanager.Steps,
-                    PlayerInfo = _searchInfoBySide(side)
-                };
-                Connector.PushMsgByChannel(Channel, sideNext);
-            };
+            //};
+            //Gamemanager.PlayerChessMove += (sender, e) =>
+            //{
+            //    PMove pMove = new PMove()
+            //    {
+            //        RoomID = ID,
+            //        PlayerInfo = _searchInfoBySide(e.Side),
+            //        SMInfo = e
+            //    };
+            //    Connector.PushMsgByChannel(Channel, pMove);
+            //};
+            //Gamemanager.PlayerDie += (sender, side) =>
+            //{
+            //    PDie pDie = new PDie()
+            //    {
+            //        RoomID = ID,
+            //        Player = _searchInfoBySide(side),
+            //    };
+            //    Connector.PushMsgByChannel(Channel, pDie);
+            //};
+            //Gamemanager.PlayerMoveSkip += (sender, side) =>
+            //{
+            //    PSkip pSkip = new PSkip()
+            //    {
+            //        RoomID = ID,
+            //        PlayerInfo = _searchInfoBySide(side)
+            //    };
+            //    Connector.PushMsgByChannel(Channel, pSkip);
+            //};
+            //Gamemanager.PlayerSurrender += (sender, e) =>
+            //{
+            //    PSurr pSurr = new PSurr()
+            //    {
+            //        RoomID = ID,
+            //        PlayerInfo = _searchInfoBySide(e.Side),
+            //        Steps = e.Steps
+            //    };
+            //    Connector.PushMsgByChannel(Channel, pSurr);
+            //};
+            //Gamemanager.PlayerOfferDraw += (sender, side) =>
+            //{
+            //    PODraw pODraw = new PODraw()
+            //    {
+            //        RoomID = ID,
+            //        PlayerInfo = _searchInfoBySide(side),
+            //    };
+            //    Connector.PushMsgByChannel(Channel, pODraw);
+            //};
+            //Gamemanager.PlayerAgrreDraw += (sender, side) => {
+            //    PADraw pADraw = new PADraw()
+            //    {
+            //        RoomID = ID,
+            //        PlayerInfo = _searchInfoBySide(side),
+            //    };
+            //    Connector.PushMsgByChannel(Channel, pADraw);
+            //};
+            //Gamemanager.PlayerRefuseDraw += (sender, e) =>
+            //{
+            //    PRDraw pRDraw = new PRDraw()
+            //    {
+            //        RoomID = ID,
+            //        PlayerInfo = _searchInfoBySide(e.Side),
+            //        DRecord = e.DrawRecord
+            //    };
+            //    Connector.PushMsgByChannel(Channel, pRDraw);
+            //};
+            //Gamemanager.ExpireDraw += (sender, record) =>
+            //{
+            //    ExpireDraw expireDraw = new ExpireDraw()
+            //    {
+            //        RoomID = ID,
+            //        DRecord = record
+            //    };
+            //    Connector.PushMsgByChannel(Channel, expireDraw);
+            //};
+            //Gamemanager.PlayerSiLingDied += (sender, chelist) =>
+            //{
+            //    PSiLingDied pSiLingDied = new PSiLingDied()
+            //    {
+            //        RoomID = ID,
+            //        PlayerInfo = _searchInfoBySide(chelist[0].chess.Side),
+            //        chessInfo = chelist
+            //    };
+            //    Connector.PushMsgByChannel(Channel, pSiLingDied);
+            //};
+            //Gamemanager.SideNext += (sender, side) =>
+            //{
+            //    SideNext sideNext = new SideNext()
+            //    {
+            //        RoomID = ID,
+            //        Steps = Gamemanager.Steps,
+            //        PlayerInfo = _searchInfoBySide(side)
+            //    };
+            //    Connector.PushMsgByChannel(Channel, sideNext);
+            //};
 
-            Gamemanager.GameLayouting += (sender, e) =>
-            {
-                Connector.PushMsgByChannel(Channel, new GameLayouting() { RoomID = ID });
-            };
-            Gamemanager.GameStart += (sender, e) =>
-            {
-                Connector.PushMsgByChannel(Channel, new GameStart() { RoomID = ID, LayoutDic = e });
-            };
-            Gamemanager.GameOver += (sender, e) =>
-            {
-                Connector.PushMsgByChannel(Channel, new GameOver() { RoomID = ID, GResult = e });
-            };
-            Gamemanager.GameClose += (sender, e) =>
-            {
-                Connector.PushMsgByChannel(Channel, new GameClose() { RoomID = ID });
-            };
+            //Gamemanager.GameLayouting += (sender, e) =>
+            //{
+            //    Connector.PushMsgByChannel(Channel, new GameLayouting() { RoomID = ID });
+            //};
+            //Gamemanager.GameStart += (sender, e) =>
+            //{
+            //    Connector.PushMsgByChannel(Channel, new GameStart() { RoomID = ID, LayoutDic = e });
+            //};
+            //Gamemanager.GameOver += (sender, e) =>
+            //{
+            //    Connector.PushMsgByChannel(Channel, new GameOver() { RoomID = ID, GResult = e });
+            //};
+            //Gamemanager.GameClose += (sender, e) =>
+            //{
+            //    Connector.PushMsgByChannel(Channel, new GameClose() { RoomID = ID });
+            //};
         }
         /// <summary>
         /// 根据房间ID搜索房间，找不到返回Room类型的默认值(null)
@@ -613,7 +613,7 @@ namespace Server
                 Room room = _searchRoomByID(data.RoomID);
                 if (room!=default(Room))
                 {
-                    Room.PlayerInfo playerInfo=  room.SearchInfoByUID(session.UID);
+                    Room.PlayerInfo playerInfo=  Room.SearchInfoByUID(session.UID,room);
                     if (playerInfo != default(Room.PlayerInfo))
                     {
                         room.Gamemanager.Ready(playerInfo.Side, data.CheLayout);
@@ -663,7 +663,7 @@ namespace Server
             room = _searchRoomByID(roomid);
             if (room != default(Room))
             {
-                playerInfo = room.SearchInfoByUID(session.UID);
+                playerInfo = Room.SearchInfoByUID(session.UID,room);
                 if (playerInfo!=default(Room.PlayerInfo))
                     return true;
             }
