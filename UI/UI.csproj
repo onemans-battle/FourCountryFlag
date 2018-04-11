@@ -99,9 +99,9 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\四国军旗\四国军旗.csproj">
+    <ProjectReference Include="..\四国军旗\FourCountryFlag.csproj">
       <Project>{1434f9e4-e704-4ccd-a0e7-623b2da35881}</Project>
-      <Name>四国军旗</Name>
+      <Name>FourCountryFlag</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

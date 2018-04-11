@@ -7,8 +7,8 @@
     <ProjectGuid>{1434F9E4-E704-4CCD-A0E7-623B2DA35881}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>四国军旗</RootNamespace>
-    <AssemblyName>四国军旗</AssemblyName>
+    <RootNamespace>FourCountryFlag</RootNamespace>
+    <AssemblyName>FourCountryFlag</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>

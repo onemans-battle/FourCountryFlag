@@ -6,8 +6,8 @@
     <ProjectGuid>{76573A5B-5430-4228-8857-5AE5CF236CB8}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>四国军旗Tests</RootNamespace>
-    <AssemblyName>四国军旗Tests</AssemblyName>
+    <RootNamespace>FourCountryFlagTests</RootNamespace>
+    <AssemblyName>FourCountryFlagTests</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{3AC096D0-A1C2-E12C-1390-A8335801FDAB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
@@ -65,9 +65,9 @@
     <Compile Include="UnitTest1.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\四国军旗\四国军旗.csproj">
+    <ProjectReference Include="..\四国军旗\FourCountryFlag.csproj">
       <Project>{1434F9E4-E704-4CCD-A0E7-623B2DA35881}</Project>
-      <Name>四国军旗</Name>
+      <Name>FourCountryFlag</Name>
     </ProjectReference>
   </ItemGroup>
   <Choose>
