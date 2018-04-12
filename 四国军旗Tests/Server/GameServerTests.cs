@@ -21,7 +21,7 @@ namespace Server.Tests
         [TestMethod()]
         public void StartUpTest()
         {
-            GameServer gameServer = new GameServer();
+            GameServer gameServer = new GameServer(System.Net.IPAddress.Loopback);
             gameServer.StartUp();
 
             LoginIn loginIn = new LoginIn() { UserName = "123456", Password = "123456" };

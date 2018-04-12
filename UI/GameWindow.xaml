@@ -26,12 +26,18 @@
         <Style x:Key="大本营" TargetType="{x:Type Rectangle}">
             <Setter Property="Stroke" Value="Silver"/>
         </Style>
-
+        <Style x:Key="UnableChessButton" TargetType="{x:Type Button}">
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="false">
+                    <Setter Property="Background" Value="{x:Null}"></Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
     <Grid UseLayoutRounding="True" x:Name="Room">
         <Label x:Name="GameInfo" Content="四国军旗" FontSize="16" />
-        <TextBlock x:Name="NetMsgTextBlock" HorizontalAlignment="Left" Margin="10,368,0,0" TextWrapping="Wrap" Text="接收到的网络消息：" VerticalAlignment="Top" Height="127" Width="182" FontSize="14" ScrollViewer.CanContentScroll="True" ScrollViewer.HorizontalScrollBarVisibility="Visible"/>
-        
+        <TextBlock x:Name="NetMsgTextBlock" HorizontalAlignment="Left" Margin="10,48,0,0" TextWrapping="Wrap" Text="接收到的网络消息：" VerticalAlignment="Top" Height="447" Width="182" FontSize="14" ScrollViewer.CanContentScroll="True" ScrollViewer.HorizontalScrollBarVisibility="Visible"/>
+
         <Viewbox>
             <Grid  x:Name="CheckboardGrid" Margin="6" Initialized="CheckboardGrid_Initialized" MinWidth="730" MinHeight="600">
                 <Grid.ColumnDefinitions>
@@ -72,10 +78,11 @@
                     <RowDefinition/>
                     <RowDefinition/>
                 </Grid.RowDefinitions>
-                <TextBox x:Name="MyThridPlayer" Text="player1" Grid.Column="0" Grid.ColumnSpan="6" Grid.RowSpan="6" Grid.Row="0" BorderBrush="{x:Null}" Background="{x:Null}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                <TextBox x:Name="MySencondPlayer" Text="player2" Grid.Column="11" Grid.ColumnSpan="6" Grid.RowSpan="6" Grid.Row="0" BorderBrush="{x:Null}" Background="{x:Null}" HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
-                <TextBox x:Name="MyForthPlayer" Text="player3" Grid.Column="0" Grid.ColumnSpan="6" Grid.RowSpan="6" Grid.Row="11" BorderBrush="{x:Null}" Background="{x:Null}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
-                <TextBox x:Name="MyFirstPlayer" Text="player4" Grid.Column="11" Grid.ColumnSpan="6" Grid.RowSpan="6" Grid.Row="11" BorderBrush="{x:Null}" Background="{x:Null}" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                <ProgressBar x:Name="TickProgressBar" Grid.Column="0" Grid.Row="0"  Grid.ColumnSpan="4" Maximum="30" Value="30" MinHeight="10" VerticalAlignment="Center" HorizontalAlignment="Center" UseLayoutRounding="False" SmallChange="1" MinWidth="120" />
+                <TextBox x:Name="MyThridPlayerTextBox" Text="player3" Grid.Column="0" Grid.ColumnSpan="6" Grid.RowSpan="6" Grid.Row="0" BorderBrush="{x:Null}" Background="{x:Null}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                <TextBox x:Name="MySencondPlayerTextBox" Text="player2" Grid.Column="11" Grid.ColumnSpan="6" Grid.RowSpan="6" Grid.Row="0" BorderBrush="{x:Null}" Background="{x:Null}" HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
+                <TextBox x:Name="MyForthPlayerTextBox" Text="player4" Grid.Column="0" Grid.ColumnSpan="6" Grid.RowSpan="6" Grid.Row="11" BorderBrush="{x:Null}" Background="{x:Null}" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                <TextBox x:Name="MyFirstPlayerTextBox" Text="player1" Grid.Column="11" Grid.ColumnSpan="6" Grid.RowSpan="6" Grid.Row="11" BorderBrush="{x:Null}" Background="{x:Null}" HorizontalAlignment="Left" VerticalAlignment="Center"/>
                 <Button x:Name="MatchButton" Content="匹配" Margin="6" Grid.ColumnSpan="3" Grid.Column="13" Grid.Row="11" FontWeight="Bold" Cursor="Hand" BorderThickness="1" IsEnabled="False" Click="MatchButton_Click" />
                 <Button x:Name="ReadyButton" Margin="6" Grid.ColumnSpan="3" Grid.Column="13" Grid.Row="12" Content="准备" FontWeight="Bold" Cursor="Hand" BorderThickness="1" IsEnabled="False" Click="ReadyButton_Click"  />
                 <Button x:Name="SurrenderButton" Margin="6" Grid.ColumnSpan="3" Grid.Column="13" Grid.Row="13" Content="投降" FontWeight="Bold" Cursor="Hand" BorderThickness="1" IsEnabled="False" />
@@ -101,8 +108,9 @@
                 </Grid.RowDefinitions>
 
                 <Label x:Name="LoginInfoLable"  FontSize="16" Grid.Row="4" Grid.ColumnSpan="4" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" MinWidth="150" MinHeight="30"/>
-                <TextBox x:Name="UsernameTextB" Grid.Row="1" Grid.ColumnSpan="4" Grid.Column="1" Text="username" HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="150" MinHeight="30" TextAlignment="Center" FontSize="16" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" HorizontalScrollBarVisibility="Disabled" MaxLines="1"/>
-                <PasswordBox x:Name="PasswordTextB" Grid.Row="2" Grid.ColumnSpan="4" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="150" MinHeight="30" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" MaxLength="20" AutomationProperties.HelpText="password"/>
+                <TextBox x:Name="IPAndPortTextB" Grid.Row="0" Grid.ColumnSpan="4" Grid.Column="1" Text="127.0.0.1:8080" HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="150" MinHeight="30" TextAlignment="Center" FontSize="16" VerticalContentAlignment="Center" HorizontalContentAlignment="Center"  MaxLines="1"/>
+                <TextBox x:Name="UsernameTextB" Grid.Row="1" Grid.ColumnSpan="4" Grid.Column="1" Text="Student" HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="150" MinHeight="30" TextAlignment="Center" FontSize="16" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" HorizontalScrollBarVisibility="Disabled" MaxLines="1"/>
+                <PasswordBox x:Name="PasswordTextB" Password="Student" Grid.Row="2" Grid.ColumnSpan="4" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="150" MinHeight="30" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" MaxLength="20" AutomationProperties.HelpText="password"/>
                 <Button  x:Name="LoginButton" Content="登录" Grid.Row="3" Grid.ColumnSpan="4" Grid.Column="1" Click="LoginButton_Click" MinWidth="100" MinHeight="30" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Grid>
         </Viewbox>

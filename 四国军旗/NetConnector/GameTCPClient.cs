@@ -61,7 +61,10 @@ namespace NetConnector
             coder = new Coder(Role.Client);
 
         }
-
+        public void Close()
+        {
+            TcpClient.Close();
+        }
         public void StartUp(IPAddress ip, int port=8080)
         {
             TcpClient.ConnectAsync(ip, port).Wait();

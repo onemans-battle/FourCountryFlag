@@ -4,7 +4,7 @@
 # ignore an entire directory
 /learning/
 /ËÄ¹ú¾üÆìTests/
-
+/learningWPF/
 
 # User-specific files
 *.suo

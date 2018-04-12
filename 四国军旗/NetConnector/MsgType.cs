@@ -87,7 +87,7 @@ namespace NetConnector.MsgType
     //房间模块接收的无应答请求(通过广播获得结果)，所有与房间内有关的请求，都包含请求头RoomID
     /// <summary>
     /// 请求类型有：进入房间、退出房间、准备、取消准备、行棋、跳过行棋、投降、
-    /// 请求和棋、同意和棋、拒绝和棋、请求游戏信息
+    /// 请求和棋、同意和棋、拒绝和棋
     /// </summary>
     public enum RoomReqType
     {
@@ -101,7 +101,6 @@ namespace NetConnector.MsgType
         ODraw,
         Adraw,
         RDraw,
-        GetInfo
     }
     public struct Enter
     {
@@ -116,6 +115,9 @@ namespace NetConnector.MsgType
         public ulong RoomID;
         public int[,] CheLayout;
     }
+    /// <summary>
+    /// 取消准备
+    /// </summary>
     public struct CReady
     {
         public ulong RoomID;
@@ -143,10 +145,6 @@ namespace NetConnector.MsgType
         public ulong RoomID;
     }
     public struct RDraw
-    {
-        public ulong RoomID;
-    }
-    public struct GetInfo
     {
         public ulong RoomID;
     }
@@ -298,7 +296,7 @@ namespace NetConnector.MsgType
     public struct RGInfo
     {
         public ulong RoomID;
-        public Room.PlayerInfo PlayerInfo;
+        public System.Collections.Generic.List<Room.PlayerInfo> PlayerInfo;
         public GameMode GMode;
         public GameStatus GStatus;
         public ushort Step;//0-65535
@@ -314,7 +312,10 @@ namespace NetConnector.MsgType
     public struct GetquestError
     {
         /// <summary>
-        /// 101:账号未登录
+        /// 101:账号未登录；
+        /// 102匹配异常：玩家在游戏中；
+        /// 103房间不存在。
+        /// 104玩家不在指定房间中
         /// </summary>
         public ushort Code;
         public string ClientMsgType;

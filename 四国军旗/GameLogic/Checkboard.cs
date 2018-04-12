@@ -757,7 +757,12 @@ namespace GameLogic
                 VertexDataM[item.coord.i, item.coord.j].Chess = item.chess;
             }
         }
-        //寻找顶点Coord上的棋子可到达的所有顶点及其路径信息：采用广度优先搜索算法（解决工兵的最短路径问题）
+        /// <summary>
+        /// 寻找顶点Coord上的棋子可到达的所有顶点及其路径信息，返回以起点为根节点的树。
+        /// 采用广度优先搜索算法（解决工兵的最短路径问题）
+        /// </summary>
+        /// <param name="c"></param>
+        /// <returns></returns>
         /*除地雷和位于大本营的棋子的其他棋子可以行走；
         * 所有棋子行进不可逆转/回退。
         * 若走铁路：
@@ -900,11 +905,10 @@ namespace GameLogic
                 throw new GameRuleException("非法的行棋请求：行棋路径不符合规则");
         }
         //根据行走结果，将棋子放置到相应位置。
-        //移动结果若是非法移动，抛出异常。
-        public void Move( MoveInfo mInfo)
+        public void Move( SimpleMoveInfo mInfo)
         {
-            Coord chessC = mInfo.MovingChess.coord, endC = mInfo.Path[mInfo.Path.Length - 1];
-            switch (mInfo.MType)
+            Coord chessC = mInfo.StartC, endC = mInfo.EndC;
+            switch (mInfo.MoveR)
             {
                 case MoveResult.Normal:
                 case MoveResult.Eat:
@@ -991,7 +995,11 @@ namespace GameLogic
 
         #endregion 对局中要使用的功能
 
-        //获取当前棋盘上的所有棋子
+
+        /// <summary>
+        /// 获取当前棋盘上的所有棋子
+        /// </summary>
+        /// <returns></returns>
         public ChessInfo[] GetCurrentChesses()
         {
             List<ChessInfo> ci = new List<ChessInfo>(100);
@@ -1000,6 +1008,26 @@ namespace GameLogic
                 for (int j = 0; j < n; j++)
                 {
                     if (VertexDataM[i, j].Chess!=null)
+                    {
+                        ci.Add(new ChessInfo(new Coord(i, j), VertexDataM[i, j].Chess));
+                    }
+                }
+            }
+            return ci.ToArray();
+        }
+        /// <summary>
+        /// 获取当前棋盘上的某方所有棋子
+        /// </summary>
+        /// <param name="side"></param>
+        /// <returns></returns>
+        public ChessInfo[] GetCurrentChesses(OfSide side)
+        {
+            List<ChessInfo> ci = new List<ChessInfo>(100);
+            for (int i = 0; i < n; i++)
+            {
+                for (int j = 0; j < n; j++)
+                {
+                    if (VertexDataM[i, j].Chess != null && VertexDataM[i, j].Chess.Side==side)
                     {
                         ci.Add(new ChessInfo(new Coord(i, j), VertexDataM[i, j].Chess));
                     }
@@ -1495,6 +1523,17 @@ namespace GameLogic
             return ExchangeToString.Array(chs,item =>item.ToString()
                                                 );
         }
+
+        /// <summary>
+        /// 坐标变换
+        /// </summary>
+        /// <param name="c"></param>
+        /// <param name="side"></param>
+        /// <returns></returns>
+        //public Coord exchenge(Coord c,OfSide side)
+        //{
+
+        //}
     }
 
 }

@@ -51,7 +51,10 @@ namespace NetConnector
             UID = uid;
             RoomID = 0;
         }
-        
+        public void Close()
+        {
+            TcpClient.Close();
+        }
 
 
     }
@@ -72,6 +75,7 @@ namespace NetConnector
         public event EventHandler<NetClientMsgEventArgs> MsgReceived;
         public event EventHandler<Session> SessiontAccept;//暂时保留
         public event EventHandler<Session> SessionClose;
+        public event EventHandler ConnectorClose;
         public List<Session> Sessions;
 
         private readonly int MaxClient;
@@ -91,18 +95,29 @@ namespace NetConnector
             TcpListener.Start(backlog);
             try
             {
-
                 while (true)
                 {
                     Accept(await TcpListener.AcceptTcpClientAsync());
                 }  
+            }
+            catch(Exception e)
+            {
+                return;
             }
             finally
             {
                 TcpListener.Stop();
             }
         }
-
+        public void Close()
+        {
+            foreach (var s in Sessions)
+            {
+                s.Close();
+            }
+            Sessions.Clear();
+            TcpListener.Stop();
+        }
 
         //满载则发送消息并断开，空闲则保持此连接
         private void Accept(TcpClient client)
@@ -219,7 +234,7 @@ namespace NetConnector
             
             if (Sessions.Remove(session))
             {
-                session.TcpClient.Close();
+                session.Close();
                 SessionClose?.Invoke(this, session);
             }
         }

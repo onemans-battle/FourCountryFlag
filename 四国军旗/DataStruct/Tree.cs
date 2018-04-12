@@ -77,7 +77,10 @@ namespace DataStruct
             return stack.ToArray();
 
         }
-        //输出所有节点的数据；
+        /// <summary>
+        /// 输出所有节点的数据；包括根节点
+        /// </summary>
+        /// <returns></returns>
         public DT[] ToArray()
         {
             DT[] dtArray = new DT[_nodelist.Count];

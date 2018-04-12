@@ -219,6 +219,7 @@ namespace GameLogic
                     _moveTimer = new System.Timers.Timer(ChessMoveInterval) { AutoReset = false };
                     _moveTimer.Elapsed += (sender, elapsedEventArgs) => {
                         _PlayersInfo[NowCanMoveSide].SkipNum+=1;//记录此次跳过行棋
+                        Steps++;
                         PlayerMoveSkip?.Invoke(this,NowCanMoveSide);
                         if (_PlayersInfo[NowCanMoveSide].SkipNum>=SkipMaxNum)
                         {
@@ -271,14 +272,11 @@ namespace GameLogic
         {        
             get { return _side; }
             private set {
-                if (_side!=value)
-                {
-                    //参数超出枚举值检测？不需要，因为对其的设置都在内部进行。
-                    _side = value;
-                    _moveTimer.Stop();//重置定时器
-                    _moveTimer.Start();
-                    SideNext?.Invoke(this,value);
-                }
+                //参数超出枚举值检测？不需要，因为对其的设置都在内部进行。
+                _side = value;
+                _moveTimer.Stop();//重置定时器
+                _moveTimer.Start();
+                SideNext?.Invoke(this,value);
             }
         }
         System.Timers.Timer _moveTimer;//行棋定时器
@@ -553,7 +551,6 @@ namespace GameLogic
                         throw new GameManagerException("玩家退出", "玩家已退出或掉线，无法正确完成此退出请求！");
                     else //玩家未准备、玩家准备了，这只能说明是代码出错了
                         throw new GameManagerCodeException("GameManager.Exit()", "调用玩家退出方法时，代码存在逻辑错误！");
-                    break;
                 case GameStatus.Closed:
                     throw new GameManagerException("玩家退出", "非法的玩家退出请求：游戏已关闭");
                 default:
@@ -689,11 +686,24 @@ namespace GameLogic
             PlayerChessMove?.Invoke(this, new SimpleMoveInfo(Steps,side,mi.MType,startC,endC));
 
             //检测有无司令或军旗死亡
-            ChessInfo[] chessInfos = new ChessInfo[2] { mi.CrashedChess, mi.MovingChess };
-            if (mi.MType==MoveResult.Normal)
-                chessInfos = new ChessInfo[1] { mi.MovingChess };
-            else  chessInfos = new ChessInfo[2] {mi.CrashedChess,mi.MovingChess};
-            foreach (var chessInfo in chessInfos)
+            ChessInfo[] deadChessInfo ;
+            switch (mi.MType)
+            {
+                case MoveResult.Eat:
+                    deadChessInfo = new ChessInfo[1] { mi.CrashedChess };
+                    break;
+                case MoveResult.BeEated:
+                    deadChessInfo = new ChessInfo[1] { mi.MovingChess };
+                    break;
+                case MoveResult.TheSameTimeToDie:
+                    deadChessInfo = new ChessInfo[2] { mi.CrashedChess,mi.MovingChess };
+                    break;
+                case MoveResult.Normal:
+                default:
+                    deadChessInfo = new ChessInfo[0] ;
+                    break;
+            }
+            foreach (var chessInfo in deadChessInfo)
             {
                 switch (chessInfo.chess.Type)
                 {
@@ -712,7 +722,6 @@ namespace GameLogic
                         break;
                 }
             }
-            
             //更新游戏状态、返回结果
             _updateGameStatus();
             if (side==NowCanMoveSide&& Status == GameStatus.Doing)//若游戏还未结束且此时是轮到该玩家行棋
@@ -731,7 +740,7 @@ namespace GameLogic
             }
 
             //至此开始跳过行棋
-            Steps+=1;
+            Steps++;
             if (++_PlayersInfo[side].SkipNum>=SkipMaxNum)//若超出允许的次数
                 Surrender(side);//投降
             else  _updateNextSide();
@@ -906,9 +915,26 @@ namespace GameLogic
             return default(ChessInfo[]);
         }
 
-        //根据当前游戏的信息，根据棋子对此方的可见性，模糊化布阵图。
-        public static void FuzzifyLayout(ref int[,] ci, OfSide from,OfSide to, GameMode mode)
+        /// <summary>
+        /// 根据当前游戏的信息，根据棋子对此方的可见性，模糊化布阵图。
+        /// 默认参数都合法
+        /// </summary>
+        /// <param name="ci"></param>
+        /// <param name="from"></param>
+        /// <param name="to"></param>
+        /// <param name="mode"></param>
+        public static int[,] FuzzifyLayout(int[,] ci, OfSide from,OfSide to, GameMode mode)
         {
+            //拷贝二维数组
+            int[,] layout = new int[ci.GetLength(0), ci.GetLength(1)];
+            for (int i = 0; i < layout.GetLength(0); i++)
+            {
+                for (int j = 0; j < layout.GetLength(1); j++)
+                {
+                    layout[i, j] = ci[i,j];
+                }
+            }
+            //转化
             switch (mode)
             {
                 case GameMode.SiMing:
@@ -917,12 +943,12 @@ namespace GameLogic
                 case GameMode.Solo:
                     if (from!= to)
                     {
-                        for (int i = 0; i < ci.GetLength(0); i++)
+                        for (int i = 0; i < layout.GetLength(0); i++)
                         {
-                            for (int j = 0; j < ci.GetLength(1); j++)
+                            for (int j = 0; j < layout.GetLength(1); j++)
                             {
-                                if(ci[i, j]!=-2)
-                                    ci[i, j] =  -1 ;
+                                if(layout[i, j]!=-2)
+                                    layout[i, j] =  -1 ;
                             }
                         }
                     }
@@ -930,12 +956,12 @@ namespace GameLogic
                 case GameMode.ShuangMing:
                     if (from != to || Math.Abs(from-to)!=2)
                     {
-                        for (int i = 0; i < ci.GetLength(0); i++)
+                        for (int i = 0; i < layout.GetLength(0); i++)
                         {
-                            for (int j = 0; j < ci.GetLength(1); j++)
+                            for (int j = 0; j < layout.GetLength(1); j++)
                             {
-                                if (ci[i, j] != -2)
-                                    ci[i, j] = -1;
+                                if (layout[i, j] != -2)
+                                    layout[i, j] = -1;
                             }
                         }
                     }
@@ -943,12 +969,55 @@ namespace GameLogic
                 default:
                     break;
             }
+            return layout;
         }
 
-        //根据当前游戏的信息，根据棋子对此方的可见性，模糊化棋盘上的棋子信息（送给客户端）。
-        public static void FuzzifyChessInfo(ref ChessInfo[] ci, OfSide side, GameMode mode)
+        /// <summary>
+        /// 根据当前游戏的信息，根据棋子对此方的可见性，模糊化棋盘上的棋子信息（送给客户端）。
+        /// 默认参数都合法
+        /// </summary>
+        /// <param name="ci"></param>
+        /// <param name="toside"></param>
+        /// <param name="mode"></param>
+        public static ChessInfo[] FuzzifyChessInfo(ChessInfo[] ci, OfSide toside, GameMode mode)
         {
-
+            ChessInfo[] chessInfos=new ChessInfo[ci.Length];
+            for (int i = 0; i < chessInfos.Length; i++)
+            {
+                chessInfos[i] = ci[i];
+            }
+            switch (mode)
+            {
+                case GameMode.SiMing:
+                    break;
+                case GameMode.SiAn:
+                case GameMode.Solo://除自己以外所有都隐藏掉
+                    {
+                        for (int i = 0; i < chessInfos.Length; i++)
+                        {
+                            if (chessInfos[i].chess.Side != toside)
+                            {
+                                chessInfos[i].chess.Type = ChessType.UnKnow;
+                            }
+                        }
+                    }
+                    break;
+                case GameMode.ShuangMing:
+                    {
+                        for (int i = 0; i < chessInfos.Length; i++)
+                        {
+                            int abs = Math.Abs(chessInfos[i].chess.Side - toside);
+                            if (abs != 2||abs!=0)//非同盟
+                            {
+                                chessInfos[i].chess.Type = ChessType.UnKnow;
+                            }
+                        }
+                    }
+                    break;
+                default:
+                    break;
+            }
+            return chessInfos;
         }
 
         public void Close()
@@ -1158,7 +1227,7 @@ namespace GameLogic
                 if (index == _playerMoveOrder.Length-1)//找到的是尾部的索引
                     nextsideIndex = 0;
                 else nextsideIndex = index + 1;
-                for (int i=0; i< _playerMoveOrder.Length - 1; i++, nextsideIndex++)
+                for (int i=0; i< _playerMoveOrder.Length - 1; i++)
                 {
                     nextside = _playerMoveOrder[nextsideIndex];
                     if (_PlayersInfo.TryGetValue(nextside,out SideInfo playerInfo))
@@ -1171,6 +1240,7 @@ namespace GameLogic
                     }
                     if (nextsideIndex == _playerMoveOrder.Length - 1)//走到头了吗
                         nextsideIndex = 0;
+                    else nextsideIndex++;
                 }
                 throw new GameManagerCodeException("GameManager._updateNextSide()","找不到下一应行棋方");
             }
