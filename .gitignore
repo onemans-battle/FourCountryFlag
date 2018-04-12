@@ -4,7 +4,7 @@
 # ignore an entire directory
 /learning/
 /ËÄ¹ú¾üÆìTests/
-
+/packages/
 
 # User-specific files
 *.suo
