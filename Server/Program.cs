@@ -42,9 +42,20 @@ namespace Server
                 try
                 {
                     GameServer gameServer = new GameServer(ipAddress, port);
+                    //
+                    gameServer._connector.SessiontAccept += (sender, e) => {
+                        Console.WriteLine("接收到来自 " + e.TcpClient.Client.RemoteEndPoint.ToString() + " 的连接.");
+                    };
+                    gameServer._connector.MsgReceived += (sender, e) => {
+                        Console.WriteLine("接收到来自 " + e.Session.TcpClient.Client.RemoteEndPoint.ToString()+" 的 "+ e.MsgType.Name+" 请求.");
+                    };
+                    gameServer._connector.SessionClose += (sender, e) => {
+                        Console.WriteLine("来自 " + e.TcpClient.Client.RemoteEndPoint.ToString() + " 的连接已关闭.");
+                    };
+                    //
                     gameServer.StartUp();
                     Console.WriteLine("游戏服务器(" + ipAddress.ToString()+":"+port.ToString()+")已启动。");
-                    Console.WriteLine("请按C退出服务器");
+                    Console.WriteLine("请按C退出服务器.");
                     while (Console.ReadKey(true).Key != ConsoleKey.C) ;
                     Console.Write("游戏服务器(" + ipAddress.ToString() + ":" + port.ToString() + ")正在退出中.....");
                     gameServer.Close();

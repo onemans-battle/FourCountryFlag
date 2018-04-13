@@ -66,53 +66,53 @@ namespace Server
             }
         }
         /// <summary>
-        /// 进入游戏房间，随机分配座位,更新广播频道、玩家列表
+        /// 进入游戏房间，随机分配座位,更新广播频道、玩家列表。游戏进入并不会导致游戏进程产生变化
         /// </summary>
         /// <exception cref="RoomException"></exception>
         /// <exception cref="GameManagerException"></exception>
-        public OfSide PlayerEnter(ulong uid)
+        public event EventHandler<Room.PlayerInfo> PEnter;
+        public void PlayerEnter(ulong uid)
         {
             int index = PlayersInfo.FindIndex((info) => { return info.UID == uid; });
             if (index != -1)//游戏列表中有此玩家
                 throw new RoomException("请退出后再进入房间");
             OfSide side = Gamemanager.Enter();
-            PlayersInfo.Add(new PlayerInfo(uid, side));
             Channel.UIDs.Add(uid);
-            return side;
+            PlayerInfo playerInfo = new PlayerInfo(uid, side);
+            PlayersInfo.Add(playerInfo);
+            PEnter?.Invoke(this, playerInfo);
         }
         /// <summary>
-        /// 退出游戏房间，更新广播频道、玩家列表(游戏进行中不更新)
+        /// 退出游戏房间，不要调用游戏管理者的退出方法，更新广播频道、玩家列表(游戏进行中不更新)。
         /// </summary>
         /// <exception cref="RoomException"></exception>
         /// <exception cref="GameManagerCodeException"></exception>
-        public GameManager.ExitWay PlayerExit(ulong uid)
+        public void PlayerExit(ulong uid)
         {
             int index= PlayersInfo.FindIndex((info) => { return info.UID == uid; });
-            
-            if (index!=-1)
-            {
-                try
-                {
-                    OfSide side = PlayersInfo[index].Side;
-                    GameManager.ExitWay exit = Gamemanager.Exit(side);
-                    Channel.UIDs.Remove(uid);
-                    if (Gamemanager.Status != GameStatus.Doing)
-                        PlayersInfo.RemoveAt(index);
-                    return exit;
-                }
-                catch(GameManagerCodeException e)
-                {
-                    throw e;
-                }
-                catch (Exception e)
-                {
-                    throw new  RoomException(e.Message);
-                }
-                
-            }
-            else throw new RoomException("玩家不在房间中，退出房间失败");
-        }
+            if (index == -1)
+                throw new RoomException("玩家不在房间中，退出房间失败");
 
+             //至此玩家在房间中
+            try
+            {
+                Channel.UIDs.Remove(uid);//假设成功退出
+                OfSide side = PlayersInfo[index].Side;
+                Gamemanager.Exit(side);//成功会引发事件，而服务器会广播，那么上面的频道是有必要先行更新的
+            }
+            catch(GameManagerCodeException e)
+            {
+                throw e;
+            }
+            catch (Exception e)//退出失败
+            {
+                Channel.UIDs.Add(uid);//撤销
+                throw new  RoomException(e.Message);
+            }
+            if (Gamemanager.Status != GameStatus.Doing)//游戏不在进行，玩家可以“真正”离开座位
+                PlayersInfo.RemoveAt(index);
+
+        }
         /// <summary>
         /// 根据游戏角色查找玩家信息。供给SubscriptGameEvent()使用。找不到返回默认值
         /// </summary>
@@ -153,14 +153,17 @@ namespace Server
     {
         public UInt64 UID;
         public GameMode Mode;
+        public long StartTick;
     }
-    public class GameServer
+
+    public partial class GameServer
     {
-        private Connector _connector;     //管理连接的模块
+        /// <summary>
+        /// 设置为公开，用于服务器控制台测试
+        /// </summary>
+        public Connector _connector;     //管理连接的模块,
 
         private DBAcess _dataBaseAccess;//数据库访问模块
-
-        public List<MatchingInfo> _matchingList;
 
         private List<Room> _gameRooms;//游戏房间列表
 
@@ -173,12 +176,14 @@ namespace Server
             _gameRooms = new List<Room>();
             _connector.SessionClose += _onSessionClose;
             _connector.MsgReceived += _onMsgReceived;
+            timer = new System.Timers.Timer(timeoutInterval);
+            timer.Elapsed += (sender,e)=>_checkTimeOutMatch();
         }
         public void StartUp()
         {
             _dataBaseAccess.Open();
             _connector.RunServerAsync();
-
+            timer.Start();
         }
         public void Close()
         {
@@ -193,7 +198,7 @@ namespace Server
             if (session.IsLogin)
             {
                 _matchingList.RemoveAll((item)=>item.UID==session.UID);
-                if (session.RoomID!=0)//玩家在房间内
+                if (session.RoomID!=0)//session中有房间标记
                 {
                     Room room = _searchRoomByID(session.RoomID);
                     try
@@ -204,8 +209,9 @@ namespace Server
                             _gameRooms.Remove(room);
                         }
                     }
-                    catch (RoomException exc )//不在房间中
+                    catch (RoomException exc)//房间不存在
                     {
+                        //log....
                         return;
                     }
                     
@@ -256,30 +262,7 @@ namespace Server
                     break;
             }
         }
-        #region 账号登录、注册、注销模块
-        /// <summary>
-        /// 玩家登录请求的处理方法
-        /// </summary>
-        /// <param name="session"></param>
-        /// <param name="data"></param>
-        private void _onLogin(Session session, LoginIn data)
-        {
-            if (_dataBaseAccess.AuthenAccount(data.UserName, data.Password, out ulong UID))
-            {
-                _connector.SessionBind(session,UID);
-                _connector.SendDataAsync(session, new LoginInfo() { IsLogin = true,PlayerID=UID, Info = "账号登录成功！" });
-            }
-            else _connector.SendDataAsync(session,new LoginInfo() { IsLogin=false,Info="账号不存在或密码错误!"});
-        }
-        /// <summary>
-        /// 连接器主动关闭或被动关闭会话时的处理
-        /// </summary>
-        /// <param name="session"></param>
-        private void _onSessionClose(Session session)
-        {
-
-        }
-        #endregion
+       
         
         #region 玩家信息获取模块
         /// <summary>
@@ -313,6 +296,10 @@ namespace Server
         #endregion
 
         #region 匹配模块
+        public List<MatchingInfo> _matchingList;
+        public static long timeoutInterval = TimeSpan.TicksPerMinute;//匹配请求的超时时间
+        private object thislock;
+        public System.Timers.Timer timer; //
         /// <summary>
         /// 处理匹配请求，成功则创建房间并广播给玩家。并没有处理玩家是否处于其他游戏中
         /// </summary>
@@ -330,12 +317,18 @@ namespace Server
                     ErrorInfo="玩家在游戏中，不能进行匹配"});
                 return;
             }
-                
-            MatchingInfo matchingInfo = new MatchingInfo() { Mode = match.GameMode, UID = session.UID };
-            _matchingList.Remove(matchingInfo);//总是剔除该玩家已有的匹配请求
+
+            //至此开始匹配
+            MatchingInfo matchingInfo = new MatchingInfo()
+            {
+                Mode = match.GameMode,
+                UID = session.UID,
+                StartTick = DateTime.Now.Ticks
+            };
+            _matchingList.RemoveAll((info)=>info.UID == session.UID);//总是剔除该玩家已有的匹配请求
             _matchingList.Add(matchingInfo);
             MatchInfo matchInfo;
-            if (_tryMatchGame(out UInt64[] uids, out Room room))
+            if (_tryMatchGame(out UInt64[] uids, out Room room))//若匹配到房间
             {
                 matchInfo = new MatchInfo()
                 {
@@ -346,19 +339,19 @@ namespace Server
                 };
                 _gameRooms.Add(room);
                 //清理匹配列表
-                _matchingList.RemoveAll((macthing)=> {//对于每个在匹配表中的玩家
+                _matchingList.RemoveAll((macthing) => {//对于每个在匹配表中的玩家
                     foreach (var uid in uids)
                     {
-                        if (uid== macthing.UID)//是已经匹配房间的玩家
+                        if (uid == macthing.UID)//是已经匹配房间的玩家
                             return true;
                     }
                     return false;
                 });
                 //设置会话中的RoomID
-                _connector.Sessions.ForEach((se)=> {
+                _connector.Sessions.ForEach((se) => {
                     foreach (var uid in uids)
                     {
-                        if (uid==se.UID)
+                        if (uid == se.UID)
                         {
                             se.RoomID = room.ID;
                             return;
@@ -367,16 +360,17 @@ namespace Server
                 });
                 //广播匹配结果
                 _connector.PushMsgByChannel(room.Channel, matchInfo);
+                //通告游戏开始
+                _connector.PushMsgByChannel(room.Channel, new GameLayouting() { RoomID=room.ID});
                 //开启游戏房间内的事件广播
                 SubscriptGameEvent(room);
-                return;
             }
             else //未匹配到游戏
             {
-                matchInfo = new MatchInfo() { HasAGame = false };
-                _connector.SendDataAsync(session, matchInfo);
-                return;
+                //matchInfo = new MatchInfo() { HasAGame = false };
+                //_connector.SendDataAsync(session, matchInfo);
             }
+            
         }
         /// <summary>
         /// 匹配算法,匹配到则返回true并创建房间，否则为false。它最多只匹配到一个房间，成功后不再进行匹配。
@@ -445,10 +439,37 @@ namespace Server
             int num=_matchingList.RemoveAll((info)=>  session.UID ==info.UID);
             if (num==0)//该玩家没有匹配请求
             {
-                _connector.SendDataAsync(session, new CancelMatchInfo() { IsCancel=false,Info= "该玩家没有匹配请求或已进入游戏" });
+                _connector.SendDataAsync(session, new GetquestError() { Code=105,ErrorInfo= "该玩家没有匹配请求或已进入游戏" });
             }
             else
-                _connector.SendDataAsync(session, new CancelMatchInfo() { IsCancel = true, Info = "已取消" });
+                _connector.SendDataAsync(session, new MatchInfo() { HasCancel = true, Info = "已取消" });
+        }
+        /// <summary>
+        /// 检测匹配表中超时(1分钟)的匹配请求，通告该玩家
+        /// </summary>
+        private void _checkTimeOutMatch()
+        {
+            lock (_matchingList)//可以想象成把此线程加入到当前主线程之中？？？
+            {
+                MatchingInfo[] m = _matchingList.ToArray();
+                long nowtick = DateTime.Now.Ticks;
+                MatchInfo netdata = new MatchInfo()
+                {
+                    HasCancel = true,
+                    Info = "匹配超时"
+                };
+                foreach (var item in m)
+                {
+                    if (nowtick - item.StartTick > timeoutInterval)//若该匹配请求超时
+                    {
+                        _connector.PushMsgByUID(item.UID, netdata);
+                        _matchingList.Remove(item);
+                    }
+                    else //在表头的匹配请求是等待最久的，因此前后的没有超时，后面的自然也没有
+                        break;
+                }
+            }
+           
         }
         #endregion
 
@@ -461,20 +482,11 @@ namespace Server
         /// <param name="req"></param>
         private void _onGetGInfo(Session session, GetGInfo req)
         {
-            if (!LoginFilter(session, "获取游戏信息"))
+            if (!_roomFilter(session, req.RoomID,out Room room, out Room.PlayerInfo playerInfo))
                 return;
-            if (!_roomFilter(session, req.RoomID))
-                return;
-            //搜索游戏房间
-            Room room= _searchRoomByID(req.RoomID);
-            if (room==default(Room))
-            {
-                _connector.SendDataAsync(session, new GetquestError()
-                {Code=103,ClientMsgType="获取游戏信息",ErrorInfo="游戏房间不存在"
-                });
-                return;
-            }
-            OfSide side = room.SearchInfoByUID(session.UID).Side;
+
+            //至此请求合法
+            OfSide side = playerInfo.Side;
             ChessInfo[] chessInfos = room.Gamemanager._checkbroad.GetCurrentChesses();
             ChessInfo[] endchessInfos= GameManager.FuzzifyChessInfo(chessInfos,side,room.Gamemanager.Mode);
             RGInfo rGInfo = new RGInfo()
@@ -489,11 +501,57 @@ namespace Server
             _connector.SendDataAsync(session, rGInfo);
         }
         /// <summary>
-        /// 订阅游戏管理者的事件（调用其方法时无法确定会发生的），广播给处在频道中的所有玩家。玩家进出游戏除外，此由房间类来广播
+        /// 订阅游戏管理者的事件（游戏对局中除玩家进出房间的所有事件），广播给处在频道中的所有玩家。
         /// </summary>
-        /// <remark>这样的事件有：玩家死亡、和棋超时、玩家司令阵亡、游戏开始、游戏结束、轮到下一方行棋</remark>
+        /// <remark>
+        /// 匹配到房间、开启游戏进入布阵态后，最后才开始广播游戏事件
+        /// </remark>
         private void SubscriptGameEvent(Room room)
         {
+            //玩家进出游戏
+            room.PEnter += (sender, info) =>
+            {
+                _connector.PushMsgByChannel(room.Channel, new PEnter() { RoomID = room.ID, PlayerInfo = info });
+            };
+            room.Gamemanager.PlayerExit += (sender, side) => {
+                _connector.PushMsgByChannel(room.Channel, new PExit()
+                {
+                    RoomID = room.ID,
+                    PlayerInfo = room.SearchInfoBySide(side)
+                });
+            };
+            room.Gamemanager.PlayerForceExit += (sender, info) =>
+            {
+                PForceExit pForceExit = new PForceExit()
+                {
+                    RoomID = room.ID,
+                    PlayerInfo=room.SearchInfoBySide(info.Side)
+                };
+                _connector.PushMsgByChannel(room.Channel,pForceExit);
+            };
+           
+            //游戏变化
+            room.Gamemanager.PlayerReady += (sender, readyInfo) =>
+            {
+                foreach (var uid in room.Channel.UIDs)
+                {
+                    Room.PlayerInfo toInfo = room.SearchInfoByUID(uid);
+                    Room.PlayerInfo fromInfo = room.SearchInfoBySide(readyInfo.Side);
+                    int[,] layout = GameManager.FuzzifyLayout(readyInfo.CheLayout, fromInfo.Side, toInfo.Side, room.Gamemanager.Mode);
+                    PReady pReady = new PReady()
+                    {
+                        RoomID = room.ID,
+                        CheLayout = layout,
+                        PlayerInfo = fromInfo
+                    };
+                    _connector.PushMsgByUID(uid, pReady);
+                }
+            };
+            room.Gamemanager.PlayerCancelReady += (sender, side) => {
+                _connector.PushMsgByChannel(room.Channel, new PCReady() {
+                    RoomID = room.ID, PlayerInfo = room.SearchInfoBySide(side)
+                });
+            };
             room.Gamemanager.PlayerChessMove += (sender, simplemove) =>
             {
                 PMove pMove=new PMove()
@@ -503,35 +561,6 @@ namespace Server
                     PlayerInfo = room.SearchInfoBySide(simplemove.Side),
                 };
                 _connector.PushMsgByChannel(room.Channel, pMove);
-            };
-            room.Gamemanager.PlayerDie += (sender, side) =>
-            {
-                PDie pDie = new PDie()
-                {
-                    RoomID = room.ID,
-                    Player = room.SearchInfoBySide(side),
-                };
-                _connector.PushMsgByChannel(room.Channel, pDie);
-            };
-
-            room.Gamemanager.ExpireDraw += (sender, record) =>
-            {
-                ExpireDraw expireDraw = new ExpireDraw()
-                {
-                    RoomID = room.ID,
-                    DRecord = record
-                };
-                _connector.PushMsgByChannel(room.Channel, expireDraw);
-            };
-            room.Gamemanager.PlayerSiLingDied += (sender, chelist) =>
-            {
-                PSiLingDied pSiLingDied = new PSiLingDied()
-                {
-                    RoomID = room.ID,
-                    PlayerInfo = room.SearchInfoBySide(chelist[0].chess.Side),
-                    chessInfo = chelist
-                };
-                _connector.PushMsgByChannel(room.Channel, pSiLingDied);
             };
             room.Gamemanager.SideNext += (sender, side) =>
             {
@@ -543,6 +572,48 @@ namespace Server
                 };
                 _connector.PushMsgByChannel(room.Channel, sideNext);
             };
+            room.Gamemanager.PlayerSiLingDied += (sender, chelist) =>
+            {
+                PSiLingDied pSiLingDied = new PSiLingDied()
+                {
+                    RoomID = room.ID,
+                    PlayerInfo = room.SearchInfoBySide(chelist[0].chess.Side),
+                    chessInfo = chelist
+                };
+                _connector.PushMsgByChannel(room.Channel, pSiLingDied);
+            };
+            room.Gamemanager.PlayerDie += (sender, side) =>
+            {
+                PDie pDie = new PDie()
+                {
+                    RoomID = room.ID,
+                    Player = room.SearchInfoBySide(side),
+                };
+                _connector.PushMsgByChannel(room.Channel, pDie);
+            };
+            room.Gamemanager.PlayerMoveSkip+=(sender, side)=>{
+                _connector.PushMsgByChannel(room.Channel, new PSkip()
+                {
+                    RoomID =room.ID,
+                    PlayerInfo =room.SearchInfoBySide(side)
+                });
+            };
+
+            //扩展功能
+            room.Gamemanager.ExpireDraw += (sender, record) =>
+            {
+                ExpireDraw expireDraw = new ExpireDraw()
+                {
+                    RoomID = room.ID,
+                    DRecord = record
+                };
+                _connector.PushMsgByChannel(room.Channel, expireDraw);
+            };
+
+            //游戏状态
+            room.Gamemanager.GameLayouting += (sender, e) => {
+                _connector.PushMsgByChannel(room.Channel, new GameLayouting() { RoomID = room.ID });
+            };
             room.Gamemanager.GameStart += (sender, e) =>
             {
                 _connector.PushMsgByChannel(room.Channel, new GameStart() { RoomID = room.ID, LayoutDic = e });
@@ -550,21 +621,31 @@ namespace Server
             room.Gamemanager.GameOver += (sender, e) =>
             {
                 _connector.PushMsgByChannel(room.Channel, new GameOver() { RoomID = room.ID, GResult = e });
-                //游戏结束则删除游戏、房间等资源
-                _gameRooms.Remove(room);
+                //更新房间中的玩家列表
+                foreach (var item in room.Gamemanager.PlayersInfo)
+                {
+                    if (item.Status==PlayerStatus.Eixted||
+                    item.Status == PlayerStatus.LostConnection||
+                    item.Status == PlayerStatus.ForceEixted)
+                    {
+                        room.PlayersInfo.RemoveAll((info) => info.Side == item.Side);
+                    }
+                }
+
+            };
+            room.Gamemanager.GameClose += (sender, e) =>
+            {
+                //游戏关闭则时删除游戏、房间等资源
+                //更新回话状态
                 _connector.Sessions.ForEach((session) =>
                 {
-                    foreach (var info in room.PlayersInfo)
+                    if (session.RoomID == room.ID)
                     {
-                        if(session.UID==info.UID)
-                        {
-                            session.RoomID = 0;
-                            return;
-                        }
+                        session.RoomID = 0;
                     }
                 });
-                room = null;
-
+                //移除房间
+                _gameRooms.Remove(room);
             };
 
         }
@@ -584,51 +665,34 @@ namespace Server
         /// <param name="data"></param>
         private void _onReady(Session session,Ready data)
         {
-            if(!LoginFilter(session,"游戏准备"))
+            if (!_roomFilter(session, data.RoomID, out Room room,out Room.PlayerInfo playerInfo))
                 return;
-            if (!_roomFilter(session,data.RoomID))
-                return;
+            //至此，玩家在指定的房间中
             try
             {
-                Room room = _searchRoomByID(data.RoomID);
-                if (room!=default(Room))
-                {
-                    Room.PlayerInfo fromInfo=  room.SearchInfoByUID(session.UID);
-                    if (fromInfo != default(Room.PlayerInfo))
-                    {
-                        room.Gamemanager.Ready(fromInfo.Side, data.CheLayout);
-                        foreach (var uid in room.Channel.UIDs)
-                        {
-                            Room.PlayerInfo toInfo= room.SearchInfoByUID(uid);
-                            int[,] layout= GameManager.FuzzifyLayout(data.CheLayout, fromInfo.Side, toInfo.Side, room.Gamemanager.Mode);
-                            PReady pReady = new PReady()
-                            {
-                                RoomID = room.ID,
-                                CheLayout = layout,
-                                PlayerInfo = fromInfo
-                            };
-                           _connector.PushMsgByUID(uid, pReady);
-                        }
-                    }
-                    
-                }
-                _connector.SendDataAsync(session, new GetquestError() { ClientMsgType = "Ready", ErrorInfo = "找不到该房间" });
+                room.Gamemanager.Ready(playerInfo.Side, data.CheLayout);
             }
-            catch(GameManagerException e)
+            catch (GameManagerCodeException)
+            {
+                //log....
+                throw;
+            }
+            catch (Exception e)
             {
                 _connector.SendDataAsync(session, new GetquestError() { ClientMsgType = "Ready", ErrorInfo = e.Message });
                 //log....
             }
+
+        }
+        private void _onCReady(Session session, CReady data)
+        {
+
         }
 
         private void _onMove(Session session,Move data)
         {
-            if (!LoginFilter(session, "行棋"))
+            if (!_roomFilter(session, data.RoomID,out Room room, out Room.PlayerInfo playerInfo))//玩家不在此房间中
                 return;
-            if (!_roomFilter(session, data.RoomID))//玩家不在此房间中
-                return;
-            Room room = _searchRoomByID(session.RoomID);
-            Room.PlayerInfo playerInfo = room.SearchInfoByUID(session.UID);
             try
             {
                 room.Gamemanager.Move(playerInfo.Side, data.ChessCoord, data.TargetCoord);
@@ -640,12 +704,34 @@ namespace Server
                 //log....
             }
         }
+
+        private void _onExit(Session session, Exit data)
+        {
+            if (!_roomFilter(session, data.RoomID, out Room room, out Room.PlayerInfo playerInfo))//玩家不在此房间中
+                return;
+            try
+            {
+                room.PlayerExit(session.UID);
+            }
+            catch (Exception e)
+            {
+                _connector.SendDataAsync(session, new GetquestError() { ClientMsgType = "退出", ErrorInfo = e.Message });
+                //log....
+            }
+        }
+
         /// <summary>
-        /// 玩家在房间中的过滤器。若玩家不在房间中，发送信息给客户端后返回false。若存在返回true
+        /// 玩家是否在(包括强退、游戏中正常离开)指定房间中的过滤器。若玩家不在房间中，发送信息给客户端后返回false。若存在返回true
         /// </summary>
         /// <param name="session"></param>
-        private bool _roomFilter(Session session,UInt64 roomid)
+        /// <param name="roomid">请求消息中的roomid</param>
+        private bool _roomFilter(Session session,UInt64 roomid,out Room room,out Room.PlayerInfo playerInfo)
         {
+            room = default(Room);
+            playerInfo= default(Room.PlayerInfo);
+            if (!LoginFilter(session, "游戏准备"))//登录过滤
+                return false;
+            //房间过滤
             if (session.RoomID != roomid)
             {
                 _connector.SendDataAsync(session, new GetquestError()
@@ -654,23 +740,22 @@ namespace Server
                 });
                 return false;
             }
+            room = _searchRoomByID(roomid);
+            if (room == default(Room))
+            {
+                _connector.SendDataAsync(session, new GetquestError() { Code=103, ErrorInfo = "找不到该房间" });
+                return false;
+            }
+            playerInfo = room.SearchInfoByUID(session.UID);
+            if (playerInfo == default(Room.PlayerInfo))
+            {
+                _connector.SendDataAsync(session, new GetquestError() { Code=104, ErrorInfo = "该玩家不再此房间中" });
+                return false;
+            }
             return true;
         }
         #endregion
 
-        /// <summary>
-        /// 登录检测，未登录会发送信息给客户端
-        /// </summary>
-        /// <param name="session"></param>
-        /// <returns></returns>
-        private bool LoginFilter(Session session,string msgType)
-        {
-            bool b = session.IsLogin;
-            if (!b)
-            {
-                _connector.SendDataAsync(session, new GetquestError() {Code=101, ClientMsgType = msgType, ErrorInfo = "请先登录" });
-            }
-            return b;
-        }
+        
     }
 }

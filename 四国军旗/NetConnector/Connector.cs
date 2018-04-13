@@ -33,8 +33,11 @@ namespace NetConnector
         private static int counter = 0;
         public readonly int ID;
         public UInt64 UID;//未登录为0
-        public ulong RoomID;
-        internal TcpClient TcpClient;
+        public ulong RoomID;//玩家当前所在的房间，强退等都会置为0
+        /// <summary>
+        /// 暂时设置为公开，用于服务器控制台测试
+        /// </summary>
+        public TcpClient TcpClient;
 
         public bool IsLogin
         {
@@ -51,7 +54,7 @@ namespace NetConnector
             UID = uid;
             RoomID = 0;
         }
-        public void Close()
+        internal void Close()
         {
             TcpClient.Close();
         }
@@ -234,8 +237,8 @@ namespace NetConnector
             
             if (Sessions.Remove(session))
             {
-                session.Close();
                 SessionClose?.Invoke(this, session);
+                session.Close();
             }
         }
         /// <summary>
@@ -292,9 +295,10 @@ namespace NetConnector
             }
         }
         /// <summary>
-        /// 为会话绑定玩家，只允许同一玩家绑定一个会话，此绑定会剔除原先登录的玩家
+        /// 为会话绑定玩家，只允许同一玩家绑定一个会话，此绑定会先剔除已登录的玩家
         /// </summary>
         /// <param name="uid">玩家唯一标识码</param>
+        /// <param name="data">默认值则不发送</param>
         public void SessionBind(Session session, UInt64 uid)
         {
             int index = Sessions.FindIndex((s) => { return s.UID == uid; });
@@ -304,6 +308,11 @@ namespace NetConnector
             }
             session.UID = uid;
         }
+        /// <summary>
+        /// 发送数据，解除绑定。
+        /// </summary>
+        /// <param name="session"></param>
+        /// <param name="data"></param>
         public void SessionUnBind(Session session)
         {
             session.UID = 0;

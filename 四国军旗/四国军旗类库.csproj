@@ -103,6 +103,7 @@
     <Compile Include="NetConnector\Connector.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="GameLogic\GameManager.cs" />
+    <Compile Include="Server\AccountModule.cs" />
     <Compile Include="Server\GameServerException.cs" />
     <Compile Include="Server\GameServer.cs" />
     <Compile Include="TestTool.cs" />

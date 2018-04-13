@@ -255,7 +255,7 @@ namespace GameLogic
                             playerStatus==PlayerStatus.LostConnection)
                             dic.Remove(side);
                     });
-
+                    if (_autoRestart) Status = GameStatus.Layouting;
                 }
                 else if (value == GameStatus.Closed)//游戏关闭了
                 {
@@ -281,6 +281,8 @@ namespace GameLogic
         }
         System.Timers.Timer _moveTimer;//行棋定时器
 
+        public bool _autoRestart;//游戏结束后自动重新开始
+
         public const ushort FourPlayerMaxSteps = 500;//四人游戏中最大步数，大于则和棋
         public const ushort TwoPlayerMaxSteps = 250;//二人游戏中最大步数，大于则和棋
         public const ushort ChessMoveInterval = 30*1000;//每方的行棋时间，单位为毫秒
@@ -292,7 +294,7 @@ namespace GameLogic
 
         //事件
         //在方法体内直接激发的事件：
-        public event EventHandler<OfSide> PlayerEnter;                  //玩家进场
+        //public event EventHandler<OfSide> PlayerEnter;                  //玩家进场：不会导致游戏进程变化，因此废弃
         public event EventHandler<OfSide> PlayerExit;                   //玩家退出
         public event EventHandler<PlayerForceExitEventArgs> PlayerForceExit;//玩家强制退出
         public event EventHandler<PlayerReadyEventArgs> PlayerReady;    //玩家准备
@@ -328,7 +330,11 @@ namespace GameLogic
         /// 玩家进入游戏时添加。在游戏开始前和结束后退出时剔除。
         /// </summary>
         private Dictionary<OfSide, SideInfo> _PlayersInfo;
-
+        public SideInfo[] PlayersInfo { get {
+                SideInfo[] sideInfos=new SideInfo[_PlayersInfo.Count];
+                _PlayersInfo.Values.CopyTo(sideInfos, 0);
+                return sideInfos;
+            } }
         private DrawRecord  _playerDrawRecord;//最近一次的玩家的和棋记载
         System.Timers.Timer _drawTimer;//和棋请求定时器
         
@@ -339,12 +345,12 @@ namespace GameLogic
         private GameResult _gameResult;//游戏结果
         private Queue<ChessMoveRecord> _chessMoveRecords;//行棋记录
         private Queue<DrawRecord> _drawRecords;//和棋记录
-
+        
         /// <summary>
         /// 初始化游戏管理者
         /// </summary>
         /// <param name="mode"></param>
-        public GameManager(GameMode mode=GameMode.SiAn)
+        public GameManager(GameMode mode=GameMode.SiAn, bool autoRestart=true)
         {
             if (!Enum.IsDefined(typeof(GameMode), mode))
                 throw new ArgumentOutOfRangeException("mode","不支持的游戏模式");
@@ -360,6 +366,7 @@ namespace GameLogic
             
             _checkbroad = new CheckBroad(Mode);
             Mode = mode;
+            _autoRestart = autoRestart;
         }
         public void StartUp()
         {
@@ -422,7 +429,7 @@ namespace GameLogic
             
             //至此允许玩家进场
             _PlayersInfo.Add(side, new SideInfo(side));
-                PlayerEnter?.Invoke(this, side);
+                //PlayerEnter?.Invoke(this, side);
         }
         /// <summary>
         /// 随机进场
@@ -479,7 +486,7 @@ namespace GameLogic
 
             //至此允许玩家进场
             _PlayersInfo.Add(side, new SideInfo(side));
-            PlayerEnter?.Invoke(this, side);
+            //PlayerEnter?.Invoke(this, side);
             return side;
 
         }
@@ -493,11 +500,6 @@ namespace GameLogic
         //    if (_status != GameStatus.Layouting)//游戏不处于布阵态
         //        throw new GameManagerException("玩家进场", "非法的玩家进场请求：游戏进程不允许");
         //}
-        public enum ExitWay
-        {
-            Normal=1,
-            Force,
-        }
         /// <summary>
         ///玩家退出,返回退出的方式：正常退出、强制退出。
         ///布阵时正常退出，玩家阵亡或已投降时可退出但保留玩家信息，
@@ -507,7 +509,7 @@ namespace GameLogic
         /// <exception cref="ArgumentOutOfRangeException"></exception>
         /// <exception cref="GameManagerException"></exception>
         /// <exception cref="GameManagerCodeException"></exception>
-        public ExitWay Exit(OfSide side)
+        public void Exit(OfSide side)
         {
             if (!Enum.IsDefined(typeof(OfSide), side))
                 throw new ArgumentOutOfRangeException("side", "非法的势力参数");
@@ -521,19 +523,18 @@ namespace GameLogic
                     //正常退出
                     _PlayersInfo.Remove(side);
                     PlayerExit?.Invoke(this, side);
-                    return ExitWay.Normal;
+                    break;
                 case GameStatus.Layouting://且游戏在布阵态或此盘游戏结束
                     //正常退出
                     _PlayersInfo.Remove(side);
                     PlayerExit?.Invoke(this, side);
                     _updateGameStatus();
-                    return ExitWay.Normal;
+                    break;
                 case GameStatus.Doing://游戏开始了
                     PlayerStatus playerStatus = _PlayersInfo[side].Status;
                     if (playerStatus == PlayerStatus.Death|| playerStatus==PlayerStatus.Surrendered)//但玩家阵亡或已投降
                     {
                         _PlayersInfo[side].Status = PlayerStatus.Eixted;//可以正常退出，对游戏进程无影响
-                        return ExitWay.Normal;
                     }
                     else if (playerStatus == PlayerStatus.Alive)//而玩家尚且存活
                     {//强制退出
@@ -545,12 +546,12 @@ namespace GameLogic
                         _updateGameStatus();
                         if (Status == GameStatus.Doing)//若游戏可继续
                             _updateNextSide();//则轮到下一方行棋
-                        return ExitWay.Force;
                     }
                     else if(playerStatus==PlayerStatus.Eixted|| playerStatus == PlayerStatus.ForceEixted|| playerStatus==PlayerStatus.LostConnection)
                         throw new GameManagerException("玩家退出", "玩家已退出或掉线，无法正确完成此退出请求！");
                     else //玩家未准备、玩家准备了，这只能说明是代码出错了
                         throw new GameManagerCodeException("GameManager.Exit()", "调用玩家退出方法时，代码存在逻辑错误！");
+                    break;
                 case GameStatus.Closed:
                     throw new GameManagerException("玩家退出", "非法的玩家退出请求：游戏已关闭");
                 default:
@@ -558,7 +559,14 @@ namespace GameLogic
             }
 
         }
-        //3.玩家准备。非法抛出异常，并且不做任何操作。
+        /// <summary>
+        /// 玩家准备。非法抛出异常，并且不做任何操作。
+        /// </summary>
+        /// <param name="side"></param>
+        /// <param name="layout"></param>
+        /// <exception cref="ArgumentOutOfRangeException"></exception>
+        /// <exception cref="GameRuleException"></exception>
+        /// <exception cref="GameManagerException"></exception>
         public void Ready(OfSide side, int[,] layout)
         {
             if (!Enum.IsDefined(typeof(OfSide), side))

@@ -37,17 +37,19 @@ namespace UI
             public SideInfo Mysideinfo;
             public CheckBroad CB;
         }
-        GameStatus gameStatus { set
+        GameStatus gameStatus {//根据游戏状态改变按钮是否可见、开启
+            set
             {
                 Coord viewC;
                 gameInfo.GameStatus = value;
                 switch (gameInfo.GameStatus)
                 {
                     case GameStatus.Layouting:
-                        ReadyButton.IsEnabled = true;
+                        
                         CheckboardGrid_CreateChessAndSetBingding();
                         ChessInfo[] chessInfos = CheckBroad.ConvertFromLayoutToCheInfo(CheckBroad.GetDefaultLayout(), myside);
                         gameInfo.CB.Layout(chessInfos);
+                        ReadyButton.IsEnabled = true;
                         for (int i = 0; i < chessButton.GetLength(0); i++)
                         {
                             for (int j = 0; j < chessButton.GetLength(1); j++)
@@ -63,9 +65,9 @@ namespace UI
 
                         break;
                     case GameStatus.Doing:
+                        ChessInfo[] chessInfo = CheckBroad.ConvertFromLayoutToCheInfo(CheckBroad.GetDefaultLayout(), myside);
                         HasSecondTick_lable.Visibility = Visibility.Visible;
                         ReadyButton.IsEnabled = false;
-                        ChessInfo[] chessInfo = CheckBroad.ConvertFromLayoutToCheInfo(CheckBroad.GetDefaultLayout(), myside);
                         foreach (var item in chessInfo)
                         {
                             viewC = _reverseToViewC( item.coord,myside);
@@ -76,11 +78,13 @@ namespace UI
                         SurrenderButton.IsEnabled = false;
                         OfferDrawButton.IsEnabled = false;
                         ReadyButton.IsEnabled = false;
-                        MatchButton.IsEnabled = true;
                         Timer.Stop();
                         HasSecondTick_lable.Visibility = Visibility.Hidden;
                         break;
                     case GameStatus.Closed:
+                        SurrenderButton.IsEnabled = false;
+                        OfferDrawButton.IsEnabled = false;
+                        ReadyButton.IsEnabled = false;
                         MatchButton.IsEnabled = true;
                         break;
                     default:
@@ -189,7 +193,6 @@ namespace UI
                             }
                             gameInfo.Mysideinfo = new SideInfo(myside);
                             gameInfo.CB = new CheckBroad(matchInfo.GameMode);
-                            gameStatus = GameStatus.Layouting;
                         }
                     }; break;
                 case "GameLayouting":
@@ -213,6 +216,9 @@ namespace UI
                     GameInfo.Content += "  游戏结束：胜利者是：" + gameOver.GResult.Winers+"\n";
                     gameStatus = GameStatus.Over;
                     break;
+                case "GameClose":
+                    gameStatus = GameStatus.Closed;
+                    break;
                 case "SideNext":
                     {
                         SideNext sideNext = (SideNext)netServerMsg.Data;
@@ -223,6 +229,16 @@ namespace UI
                         PMove pmove = (PMove)netServerMsg.Data;
                         gameInfo.CB.Move(pmove.SMInfo);
                     };break;
+                case "PSiLingDied":
+                    PSiLingDied pSiLingDied=(PSiLingDied)netServerMsg.Data;
+                    foreach (var cheinfo in pSiLingDied.chessInfo)
+                    {
+                        if (gameInfo.CB.VertexDataM[cheinfo.coord.i, cheinfo.coord.j].ExistChess())
+                        {
+                            gameInfo.CB.VertexDataM[cheinfo.coord.i, cheinfo.coord.j].Chess = cheinfo.chess;
+                        }
+                    }
+                    break;
                 default:
                     break;
             }

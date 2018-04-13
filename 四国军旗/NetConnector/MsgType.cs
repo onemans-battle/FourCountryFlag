@@ -15,22 +15,42 @@ namespace NetConnector.MsgType
      //此文件中的结构体定义了所有网络信息的种类,便于查看和编程
 
     #region 登录模块
-    /// <summary>
-    /// 1.登录的请求
-    /// </summary>
+    // 请求
     public struct LoginIn
     {
         public string UserName;
         public string Password;
     }
-    /// <summary>
-    /// 1.登录的响应
-    /// </summary>
+    public struct LoginOut
+    {
+       
+    }
+    public struct SignUp
+    {
+        public string UserName;
+        public string Password;
+    }
+    
+    // 响应
     public struct LoginInfo
     {
         public bool IsLogin;
         public ulong PlayerID;
         public string Info;//登录的详细信息:密码错误或账号错误等
+    }
+    public struct LoginOutInfo
+    {
+        public bool IsLoginOut;
+        public string Info;
+    }
+    public struct SignUpInfo
+    {
+        public bool CanSignUp;
+        public string UserName;
+    }
+    public struct ForceOffline
+    {
+        public string Info;
     }
     #endregion
     #region 玩家信息获取模块
@@ -64,6 +84,10 @@ namespace NetConnector.MsgType
     {
         public GameMode GameMode;
     }
+    public struct CancelMatch
+    {
+
+    }
     public struct MatchInfo
     {
         public bool HasAGame;//是否匹配到对局了
@@ -71,14 +95,6 @@ namespace NetConnector.MsgType
         public ulong RoomID; //0-18446744073709551615; 未匹配到则为0
         public GameMode GameMode;
         public Room.PlayerInfo[] PlayerInfo;
-    }
-    public struct CancelMatch
-    {
-        
-    }
-    public struct CancelMatchInfo
-    {
-        public bool IsCancel;
         public string Info;
     }
     #endregion
@@ -197,6 +213,11 @@ namespace NetConnector.MsgType
         public Room.PlayerInfo PlayerInfo;
         public int[,] CheLayout;
     }
+    public struct PCReady
+    {
+        public ulong RoomID;
+        public Room.PlayerInfo PlayerInfo;
+    }
     public struct PMove
     {
         public ulong RoomID;
@@ -213,6 +234,12 @@ namespace NetConnector.MsgType
     {
         public ulong RoomID;
         public Room.PlayerInfo PlayerInfo;
+    }
+    public struct PSiLingDied
+    {
+        public ulong RoomID;
+        public Room.PlayerInfo PlayerInfo;
+        public ChessInfo[] chessInfo;
     }
     public struct PSurr
     {
@@ -240,12 +267,6 @@ namespace NetConnector.MsgType
     {
         public ulong RoomID;
         public DrawRecord DRecord;
-    }
-    public struct PSiLingDied
-    {
-        public ulong RoomID;
-        public Room.PlayerInfo PlayerInfo;
-        public ChessInfo[] chessInfo;
     }
     public struct PLostC
     {
@@ -313,9 +334,10 @@ namespace NetConnector.MsgType
     {
         /// <summary>
         /// 101:账号未登录；
-        /// 102匹配异常：玩家在游戏中；
+        /// 102匹配异常:在游戏中;
         /// 103房间不存在。
         /// 104玩家不在指定房间中
+        /// 105取消匹配异常
         /// </summary>
         public ushort Code;
         public string ClientMsgType;
