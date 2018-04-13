@@ -26,6 +26,10 @@ namespace UI
     /// </summary>
     public partial class GameWindow : Window
     {
+        Task<IPAddress[]> iPAddresses;
+        IPAddress ipAddress;
+        string domainName = "junqi.online"; 
+        static int port;
         public class Game
         {
             public GameStatus GameStatus;
@@ -59,6 +63,7 @@ namespace UI
 
                         break;
                     case GameStatus.Doing:
+                        HasSecondTick_lable.Visibility = Visibility.Visible;
                         ReadyButton.IsEnabled = false;
                         ChessInfo[] chessInfo = CheckBroad.ConvertFromLayoutToCheInfo(CheckBroad.GetDefaultLayout(), myside);
                         foreach (var item in chessInfo)
@@ -72,6 +77,8 @@ namespace UI
                         OfferDrawButton.IsEnabled = false;
                         ReadyButton.IsEnabled = false;
                         MatchButton.IsEnabled = true;
+                        Timer.Stop();
+                        HasSecondTick_lable.Visibility = Visibility.Hidden;
                         break;
                     case GameStatus.Closed:
                         MatchButton.IsEnabled = true;
@@ -122,26 +129,18 @@ namespace UI
         OfSide myside;//我方势力、我方视角点
         Button[,] chessButton =new Button[17,17];
         System.Timers.Timer Timer = new System.Timers.Timer(1000) { AutoReset=true};
+        int hasSencond;
         #endregion
         public GameWindow()
         {
             InitializeComponent();
-            //LoginIn[] loginIn = new LoginIn[4]
-            //{
-            //    new LoginIn(){UserName="123456",Password="123456" },
-            //    new LoginIn(){UserName="Student",Password="Student" },
-            //    new LoginIn(){UserName="HelloWorld",Password="HelloWorld" },
-            //    new LoginIn(){UserName="Teacher",Password="Teacher" },
-            //};
-            //Match match = new Match() { GameMode = GameMode.SiAn };
-            //for (int i = 1; i < GameTCP.Count + 1; i++)
-            //{
 
-            //    GameTCP[(OfSide)i].StartUp(IPAddress.Loopback);
-            //    GameTCP[(OfSide)i].SendAsync(loginIn[i - 1]).Wait();
-            //    GameTCP[(OfSide)i].SendAsync(match).Wait();
-            //}
-            Action action = () => TickProgressBar.Value -= 1;
+            iPAddresses = Dns.GetHostAddressesAsync(domainName);
+
+            Action action = () => {
+                if(hasSencond!=0) hasSencond -= 1;
+                HasSecondTick_lable.Content = hasSencond;
+                };
             Timer.Elapsed += (sender, e) =>
             {
                 Dispatcher.Invoke(action);
@@ -251,24 +250,29 @@ namespace UI
                 }
             }
             int x=0, y=0;
-            switch (sideNext.PlayerInfo.Side)
+            switch (sideNext.PlayerInfo.Side)//(15,12-1)(4,15)  ( 1-1,4 )(12-1,1-1)
             {
                 case OfSide.First:
-                    x = 16;y = 11;
+                    x = 15;y = 12;
                     break;
                 case OfSide.Second:
-                    x = 4; y = 11;
+                    x = 4; y = 15;
                     break;
                 case OfSide.Third:
-                    x = 0; y = 2;
+                    x = 1; y =4;
                     break;
                 case OfSide.Fourth:
-                    x = 12; y = 3;
+                    x = 12; y = 1;
                     break;
             }
-            Grid.SetRow(TickProgressBar,x);
-            Grid.SetColumn(TickProgressBar, y);
-            TickProgressBar.Value = 30;
+            Coord viewCticklable = _reverseToViewC(new Coord(x, y),myside);
+            if (viewCticklable.i == 15) viewCticklable.j-=1;
+            else if (viewCticklable.i == 1) viewCticklable.i -=1;
+            else if (viewCticklable.i == 12) { viewCticklable.i-=1; viewCticklable.j-=1; }
+            Grid.SetRow(HasSecondTick_lable, viewCticklable.i);
+            Grid.SetColumn(HasSecondTick_lable, viewCticklable.j);
+            HasSecondTick_lable.Content = 30;
+            hasSencond = 30;
             Timer.Start();
         }
         private void CheckboardGrid_Loaded(object sender, RoutedEventArgs e)
@@ -457,19 +461,22 @@ namespace UI
 
         private void LoginButton_Click(object sender, RoutedEventArgs e)
         {
-           
             LoginInfoLable.Content = string.Empty;
-
-            if(GameTCP==null|| !GameTCP.TcpClient.Connected)
+            if (GameTCP==null|| !GameTCP.TcpClient.Connected)
             {
                 GameTCP = new GameTCPClient();
                 try
                 {
-                    string ipandport = IPAndPortTextB.Text;
-                    string[] s = ipandport.Split(':');
-                    IPAddress ip = IPAddress.Parse(s[0]);
-                    int port = Convert.ToInt32(s[1]);
-                    GameTCP.StartUp(ip, port);
+                    //string ipandport = IPAndPortTextB.Text;
+                    //string[] s = ipandport.Split(':');
+                    //IPAddress ip = IPAddress.Parse(s[0]);
+                    //int port = Convert.ToInt32(s[1]);
+                    if (ipAddress==default(IPAddress)&&port==default(int))
+                    {
+                        ipAddress = iPAddresses.Result[0];
+                        port = 8080;
+                    }
+                    GameTCP.StartUp(ipAddress, port);
                     GameTCP.NetMsgRev += _onMsgRecv;
                 }
                 catch (Exception exc)
@@ -478,7 +485,6 @@ namespace UI
                     return;
                 }
             }
-
             LoginIn loginIn = new LoginIn()
             {
                 UserName = UsernameTextB.Text,
