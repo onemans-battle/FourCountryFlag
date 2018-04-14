@@ -56,7 +56,7 @@ namespace GameLogic
         public readonly OfSide[] Winers;//无为空数组
         public readonly OfSide[] Losers;//
         public readonly OfSide[] ForceEixte;//强退玩家，
-        DrawRecord DrawRecord;//无则为null
+        public readonly DrawRecord DrawRecord;//无则为null
         public GameResult(bool isDraw, OfSide[] winers, OfSide[] losers, OfSide[] forceEixte, DrawRecord drawRecord=null)
         {
             IsDraw = isDraw;
@@ -294,7 +294,7 @@ namespace GameLogic
 
         //事件
         //在方法体内直接激发的事件：
-        //public event EventHandler<OfSide> PlayerEnter;                  //玩家进场：不会导致游戏进程变化，因此废弃
+        public event EventHandler<OfSide> PlayerEnter;                  //玩家进场：不会导致游戏进程变化，因此废弃
         public event EventHandler<OfSide> PlayerExit;                   //玩家退出
         public event EventHandler<PlayerForceExitEventArgs> PlayerForceExit;//玩家强制退出
         public event EventHandler<PlayerReadyEventArgs> PlayerReady;    //玩家准备
@@ -429,7 +429,7 @@ namespace GameLogic
             
             //至此允许玩家进场
             _PlayersInfo.Add(side, new SideInfo(side));
-                //PlayerEnter?.Invoke(this, side);
+                PlayerEnter?.Invoke(this, side);
         }
         /// <summary>
         /// 随机进场
@@ -486,7 +486,7 @@ namespace GameLogic
 
             //至此允许玩家进场
             _PlayersInfo.Add(side, new SideInfo(side));
-            //PlayerEnter?.Invoke(this, side);
+            PlayerEnter?.Invoke(this, side);
             return side;
 
         }
@@ -749,7 +749,9 @@ namespace GameLogic
 
             //至此开始跳过行棋
             Steps++;
-            if (++_PlayersInfo[side].SkipNum>=SkipMaxNum)//若超出允许的次数
+            _PlayersInfo[side].SkipNum++;
+            PlayerMoveSkip?.Invoke(this, side);
+            if (_PlayersInfo[side].SkipNum>=SkipMaxNum)//若超出允许的次数
                 Surrender(side);//投降
             else  _updateNextSide();
 
@@ -887,7 +889,7 @@ namespace GameLogic
                         throw new GameManagerCodeException("GameManager.AgreeDraw()", "_PlayersInfo[key].Status的值出错");
                 }
             }
-            _gameResult = new GameResult(true, winners.ToArray(), null, forceExist.ToArray(),_playerDrawRecord);
+            _gameResult = new GameResult(true, winners.ToArray(), new OfSide[0], forceExist.ToArray(),_playerDrawRecord);
             Status = GameStatus.Over;
         }
         //10.拒绝和棋
@@ -924,64 +926,49 @@ namespace GameLogic
         }
 
         /// <summary>
-        /// 根据当前游戏的信息，根据棋子对此方的可见性，模糊化布阵图。
+        /// 根据当前游戏的模式和查看布阵图的势力方，过滤AllChesesLaout变量中的布阵图
         /// 默认参数都合法
         /// </summary>
         /// <param name="ci"></param>
-        /// <param name="from"></param>
-        /// <param name="to"></param>
-        /// <param name="mode"></param>
-        public static int[,] FuzzifyLayout(int[,] ci, OfSide from,OfSide to, GameMode mode)
+        /// <param name="viewSide"></param>
+        public Dictionary<OfSide, int[,]> AllLayoutFliter( OfSide viewSide)
         {
-            //拷贝二维数组
-            int[,] layout = new int[ci.GetLength(0), ci.GetLength(1)];
-            for (int i = 0; i < layout.GetLength(0); i++)
-            {
-                for (int j = 0; j < layout.GetLength(1); j++)
-                {
-                    layout[i, j] = ci[i,j];
-                }
-            }
-            //转化
-            switch (mode)
+            Dictionary<OfSide, int[,]> layouts = new Dictionary<OfSide, int[,]>(4); 
+            //过滤式添加
+            switch (Mode)
             {
                 case GameMode.SiMing:
-                    break;
-                case GameMode.SiAn:
-                case GameMode.Solo:
-                    if (from!= to)
                     {
-                        for (int i = 0; i < layout.GetLength(0); i++)
+                        foreach (var item in AllChesesLaout)
                         {
-                            for (int j = 0; j < layout.GetLength(1); j++)
-                            {
-                                if(layout[i, j]!=-2)
-                                    layout[i, j] =  -1 ;
-                            }
+                            layouts.Add(item.Key,item.Value);
                         }
                     }
                     break;
+                case GameMode.SiAn:
+                case GameMode.Solo:
+                    break;
                 case GameMode.ShuangMing:
-                    if (from != to || Math.Abs(from-to)!=2)
                     {
-                        for (int i = 0; i < layout.GetLength(0); i++)
+                        foreach (var item in AllChesesLaout)
                         {
-                            for (int j = 0; j < layout.GetLength(1); j++)
+                            OfSide side= item.Key;
+                            if (side == viewSide|| Math.Abs(side - viewSide) == 2)//同盟
                             {
-                                if (layout[i, j] != -2)
-                                    layout[i, j] = -1;
+                                layouts.Add(side, item.Value);
                             }
+                            
                         }
                     }
                     break;
                 default:
                     break;
             }
-            return layout;
+            return layouts;
         }
 
         /// <summary>
-        /// 根据当前游戏的信息，根据棋子对此方的可见性，模糊化棋盘上的棋子信息（送给客户端）。
+        /// 根据当前游戏的信息和棋子对此方的可见性，模糊化棋盘上的棋子信息（送给客户端）。
         /// 默认参数都合法
         /// </summary>
         /// <param name="ci"></param>
@@ -1218,39 +1205,43 @@ namespace GameLogic
             _gameResult = new GameResult(true, winers.ToArray(), new OfSide[0], force.ToArray(),_playerDrawRecord);
         }
         //根据行棋顺序,设置下一个该行棋的势力,包括游戏开始时第一次设置
+        private object thielock = new object();//避免定时器与正常游戏更新时同时进入
         private void _updateNextSide()
         {
-            if (Steps == 0) NowCanMoveSide = _playerMoveOrder[0];//游戏刚开始的第一步行棋方
-            else
+            lock (thielock)
             {
-                int index=0;
-                for (; index < _playerMoveOrder.Length; index++)
+                if (Steps == 0) NowCanMoveSide = _playerMoveOrder[0];//游戏刚开始的第一步行棋方
+                else
                 {
-                    if (_playerMoveOrder[index] == NowCanMoveSide)//找到当前行棋方所在的顺序索引
-                        break;
-                }
-                //从索引往后“轮回”式查找
-                OfSide nextside;
-                int nextsideIndex;
-                if (index == _playerMoveOrder.Length-1)//找到的是尾部的索引
-                    nextsideIndex = 0;
-                else nextsideIndex = index + 1;
-                for (int i=0; i< _playerMoveOrder.Length - 1; i++)
-                {
-                    nextside = _playerMoveOrder[nextsideIndex];
-                    if (_PlayersInfo.TryGetValue(nextside,out SideInfo playerInfo))
+                    int index = 0;
+                    for (; index < _playerMoveOrder.Length; index++)
                     {
-                        if (playerInfo.Status == PlayerStatus.Alive)//下一玩家可行棋
-                        {
-                            NowCanMoveSide = nextside;
-                            return;
-                        }
+                        if (_playerMoveOrder[index] == NowCanMoveSide)//找到当前行棋方所在的顺序索引
+                            break;
                     }
-                    if (nextsideIndex == _playerMoveOrder.Length - 1)//走到头了吗
+                    //从索引往后“轮回”式查找
+                    OfSide nextside;
+                    int nextsideIndex;
+                    if (index == _playerMoveOrder.Length - 1)//找到的是尾部的索引
                         nextsideIndex = 0;
-                    else nextsideIndex++;
+                    else nextsideIndex = index + 1;
+                    for (int i = 0; i < _playerMoveOrder.Length - 1; i++)
+                    {
+                        nextside = _playerMoveOrder[nextsideIndex];
+                        if (_PlayersInfo.TryGetValue(nextside, out SideInfo playerInfo))
+                        {
+                            if (playerInfo.Status == PlayerStatus.Alive)//下一玩家可行棋
+                            {
+                                NowCanMoveSide = nextside;
+                                return;
+                            }
+                        }
+                        if (nextsideIndex == _playerMoveOrder.Length - 1)//走到头了吗
+                            nextsideIndex = 0;
+                        else nextsideIndex++;
+                    }
+                    throw new GameManagerCodeException("GameManager._updateNextSide()", "找不到下一应行棋方");
                 }
-                throw new GameManagerCodeException("GameManager._updateNextSide()","找不到下一应行棋方");
             }
         }
 
@@ -1268,10 +1259,11 @@ namespace GameLogic
             public Queue<ChessMoveRecord> ChessMoveRecords;//行棋记录
             public Queue<DrawRecord> DrawRecords;//和棋记录
             public Queue<SkipMoveRecord> SkipMoveRecord;//跳过行棋的记录
-            public GameReplay(Queue<ChessMoveRecord> chessMoveRecords, Queue<DrawRecord> drawRecords)
+            public GameReplay(Queue<ChessMoveRecord> chessMoveRecords, Queue<DrawRecord> drawRecords, Queue<SkipMoveRecord> skipMoveRecord)
             {
                 ChessMoveRecords = chessMoveRecords;
                 DrawRecords = drawRecords;
+                SkipMoveRecord = skipMoveRecord;
             }
             //输出到文件,over表示是否覆盖，是则为true,不覆盖，为true
             //异常：

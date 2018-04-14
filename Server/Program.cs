@@ -34,7 +34,6 @@ namespace Server
                     }
                     catch (Exception)
                     {
-
                         Console.WriteLine("格式错误，请重新输入。");
                         continue;
                     }
@@ -54,8 +53,7 @@ namespace Server
                     };
                     //
                     gameServer.StartUp();
-                    Console.WriteLine("游戏服务器(" + ipAddress.ToString()+":"+port.ToString()+")已启动。");
-                    Console.WriteLine("请按C退出服务器.");
+                    Console.WriteLine("游戏服务器(" + ipAddress.ToString()+":"+port.ToString()+ ")已启动. 请按C退出服务器.");
                     while (Console.ReadKey(true).Key != ConsoleKey.C) ;
                     Console.Write("游戏服务器(" + ipAddress.ToString() + ":" + port.ToString() + ")正在退出中.....");
                     gameServer.Close();
@@ -63,7 +61,7 @@ namespace Server
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine(e.Message+"");
+                    Console.WriteLine(e.Message);
                     continue;
                 }
             }

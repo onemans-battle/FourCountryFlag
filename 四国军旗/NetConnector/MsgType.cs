@@ -211,7 +211,10 @@ namespace NetConnector.MsgType
     {
         public ulong RoomID;
         public Room.PlayerInfo PlayerInfo;
-        public int[,] CheLayout;
+        /// <summary>
+        /// 推送给准备方时才设置
+        /// </summary>
+        public int[,] layout;
     }
     public struct PCReady
     {
@@ -227,7 +230,6 @@ namespace NetConnector.MsgType
     public struct PDie
     {
         public ulong RoomID;
-        public Room.PlayerInfo PlayerInfo;
         public Room.PlayerInfo Player;
     }
     public struct PSkip
@@ -291,12 +293,16 @@ namespace NetConnector.MsgType
     public struct GameStart
     {
         public ulong RoomID;
-        public System.Collections.Generic.Dictionary<OfSide, int[,]> LayoutDic;
+        /// <summary>
+        /// 只包含可见方的棋子布阵图，包括自己的
+        /// </summary>
+        public System.Collections.Generic.Dictionary<OfSide, int[,]> LayoutDic;//
     }
     public struct GameOver
     {
         public ulong RoomID;
         public GameResult GResult;
+        public GameManager.GameReplay GameReplay;
     }
     public struct GameClose
     {
@@ -338,6 +344,7 @@ namespace NetConnector.MsgType
         /// 103房间不存在。
         /// 104玩家不在指定房间中
         /// 105取消匹配异常
+        /// 106进入房间异常、已在某房间中
         /// </summary>
         public ushort Code;
         public string ClientMsgType;

@@ -46,17 +46,17 @@ namespace UI
                 {
                     case GameStatus.Layouting:
                         
-                        CheckboardGrid_CreateChessAndSetBingding();
-                        ChessInfo[] chessInfos = CheckBroad.ConvertFromLayoutToCheInfo(CheckBroad.GetDefaultLayout(), myside);
-                        gameInfo.CB.Layout(chessInfos);
                         ReadyButton.IsEnabled = true;
+                        EixtButton.IsEnabled = true;
                         for (int i = 0; i < chessButton.GetLength(0); i++)
                         {
                             for (int j = 0; j < chessButton.GetLength(1); j++)
                             {
+                                if(chessButton[i, j]!=null)
                                 chessButton[i, j].IsEnabled = false;
                             }
                         }
+                        ChessInfo[] chessInfos = gameInfo.CB.GetCurrentChesses(myside);
                         foreach (var item in chessInfos)
                         {
                             viewC = _reverseToViewC(item.coord, myside);
@@ -65,27 +65,28 @@ namespace UI
 
                         break;
                     case GameStatus.Doing:
-                        ChessInfo[] chessInfo = CheckBroad.ConvertFromLayoutToCheInfo(CheckBroad.GetDefaultLayout(), myside);
+                        clickedB = null;
                         HasSecondTick_lable.Visibility = Visibility.Visible;
                         ReadyButton.IsEnabled = false;
-                        foreach (var item in chessInfo)
-                        {
-                            viewC = _reverseToViewC( item.coord,myside);
-                            chessButton[viewC.i, viewC.j].IsEnabled = true;
-                        }
+                        SkipMoveButton.IsEnabled = true;
                         break;
                     case GameStatus.Over:
                         SurrenderButton.IsEnabled = false;
                         OfferDrawButton.IsEnabled = false;
                         ReadyButton.IsEnabled = false;
-                        Timer.Stop();
+                        SkipMoveButton.IsEnabled = false;
+                        HasSencondTimer.Stop();
                         HasSecondTick_lable.Visibility = Visibility.Hidden;
                         break;
                     case GameStatus.Closed:
                         SurrenderButton.IsEnabled = false;
                         OfferDrawButton.IsEnabled = false;
                         ReadyButton.IsEnabled = false;
+                        SkipMoveButton.IsEnabled = false;
+                        EixtButton.IsEnabled = false;
                         MatchButton.IsEnabled = true;
+                        HasSencondTimer.Stop();
+                        HasSecondTick_lable.Visibility = Visibility.Hidden;
                         break;
                     default:
                         break;
@@ -130,25 +131,59 @@ namespace UI
         GameTCPClient GameTCP;
         UInt64 roomid;
         UInt64 myuid;
-        OfSide myside;//我方势力、我方视角点
-        Button[,] chessButton =new Button[17,17];
-        System.Timers.Timer Timer = new System.Timers.Timer(1000) { AutoReset=true};
+        OfSide myside { set {
+                _myside = value;
+                CheckboardGrid_SetChessBingding();
+            }
+            get { return _myside; }
+        }//我方势力、我方视角点
+        OfSide _myside;
+        Button[,] chessButton;
+
+        System.Timers.Timer HasSencondTimer = new System.Timers.Timer(1000) { AutoReset=true};
+        System.Timers.Timer ElapsedSencondTimer = new System.Timers.Timer(1000) { AutoReset = true };
+        Action actionHasSencond;
+        Action actionElapsed;
         int hasSencond;
+        int elapsedSencond;
         #endregion
         public GameWindow()
         {
             InitializeComponent();
+            CheckboardGrid_CreateChess();
+            MatchButton.Tag = true;
 
             iPAddresses = Dns.GetHostAddressesAsync(domainName);
 
-            Action action = () => {
-                if(hasSencond!=0) hasSencond -= 1;
-                HasSecondTick_lable.Content = hasSencond;
-                };
-            Timer.Elapsed += (sender, e) =>
-            {
-                Dispatcher.Invoke(action);
+            actionHasSencond = () => {
+                if (hasSencond != 0)
+                {
+                    hasSencond -= 1;
+                    HasSecondTick_lable.Content = hasSencond;
+                }
+                else HasSencondTimer.Stop();
             };
+            actionElapsed = () => {
+                elapsedSencond += 1;
+                int mi = elapsedSencond / 60, se = elapsedSencond % 60;
+                if (mi > 0)
+                {
+                    HasSecondTick_lable.Content = mi + ":";
+                    if (se < 10) HasSecondTick_lable.Content += "0" + se.ToString();
+                    else HasSecondTick_lable.Content += se.ToString();
+                }
+                else HasSecondTick_lable.Content = se.ToString();
+            };
+            HasSencondTimer.Elapsed += (sender, e) =>
+            {
+                Dispatcher.Invoke(actionHasSencond);
+            };
+           
+            ElapsedSencondTimer.Elapsed += (sender, e) =>
+            {
+                Dispatcher.Invoke(actionElapsed);
+            };
+
         }
         private void _onMsgRecv(object sender, NetServerMsg netServerMsg)
         {
@@ -160,20 +195,34 @@ namespace UI
                         if (loginInfo.IsLogin)
                         {
                             myuid = loginInfo.PlayerID;
-                            Login.Visibility = Visibility.Hidden;
+                            LoginGrid.Visibility = Visibility.Hidden;
                             MatchButton.IsEnabled = true;
                         }
                         else
                         {
                             LoginInfoLable.Content = loginInfo.Info;
                         }
-                        NetMsgTextBlock.Text += loginInfo.Info;
+                    }
+                    break;
+                case "ForceOffline":
+                    {
+                        ForceOffline forceOffline = (ForceOffline)netServerMsg.Data;
+                        LoginInfoLable.Content = forceOffline.Info;
+                        gameStatus = GameStatus.Closed;
+                        LoginGrid.Visibility = Visibility.Visible;
                     }
                     break;
                 case "PReady":
                     {
                         PReady pr = (PReady)netServerMsg.Data;
-                        gameInfo.CB.Layout(CheckBroad.ConvertFromLayoutToCheInfo(pr.CheLayout, pr.PlayerInfo.Side));
+                        if (pr.layout!=default(int[,]))
+                        {
+                            gameInfo.CB.Layout(CheckBroad.ConvertFromLayoutToCheInfo(pr.layout, myside));
+                        }
+                        else
+                            gameInfo.CB.Layout(CheckBroad.ConvertFromLayoutToCheInfo(CheckBroad.GetUnknowLayout(), pr.PlayerInfo.Side));
+                        if (myside == pr.PlayerInfo.Side)
+                            ReadyButton.IsEnabled = false;
                     };
                     break;
                 case "MatchInfo":
@@ -181,19 +230,29 @@ namespace UI
                         MatchInfo matchInfo = (MatchInfo)netServerMsg.Data;
                         if (matchInfo.HasAGame)
                         {
+                            HasSecondTick_lable.Visibility = Visibility.Hidden;
+                            gameInfo.CB = new CheckBroad(matchInfo.GameMode);
                             MatchButton.IsEnabled = false;
                             roomid = matchInfo.RoomID;
                             foreach (var info in matchInfo.PlayerInfo)
                             {
                                 if (info.UID==myuid)
                                 {
+                                    gameInfo.Mysideinfo = new SideInfo(info.Side);
                                     myside = info.Side;
                                     break;
                                 }
                             }
-                            gameInfo.Mysideinfo = new SideInfo(myside);
-                            gameInfo.CB = new CheckBroad(matchInfo.GameMode);
+                            ChessInfo[] chessInfos = CheckBroad.ConvertFromLayoutToCheInfo(CheckBroad.GetDefaultLayout(), myside);
+                            gameInfo.CB.Layout(chessInfos);
                         }
+                        else if (matchInfo.HasCancel)//匹配被服务器取消
+                        {
+                        }
+                        HasSecondTick_lable.Content = string .Empty;
+                        MatchButton.Tag = true;
+                        MatchButton.Content = "匹配";
+                        ElapsedSencondTimer.Stop();
                     }; break;
                 case "GameLayouting":
                     {
@@ -205,30 +264,63 @@ namespace UI
                     {
                         GetquestError getquestError = (GetquestError)netServerMsg.Data;
                         if(getquestError.Code==101)
-                        Login.Visibility = Visibility.Visible;
+                            LoginGrid.Visibility = Visibility.Visible;
                     };break;
                 case "GameStart":
+                    GameStart gameStart= (GameStart)netServerMsg.Data;
+                    foreach (var layout in gameStart.LayoutDic)
+                    {
+                        gameInfo.CB.Layout(CheckBroad.ConvertFromLayoutToCheInfo(layout.Value, layout.Key));
+                    }
                     gameStatus = GameStatus.Doing;
                     break;
                 case "GameOver":
                     GameOver gameOver = (GameOver)netServerMsg.Data;
                     gameInfo.CB.ClearAllChesses();
-                    GameInfo.Content += "  游戏结束：胜利者是：" + gameOver.GResult.Winers+"\n";
+                    try
+                    {
+                        GameInfo.Content = "游戏结束：胜利者是:";
+                        foreach (var item in gameOver.GResult.Winers)
+                        {
+                            switch (item)
+                            {
+                                case OfSide.First:
+                                    GameInfo.Content += "\n第一方玩家";
+                                    break;
+                                case OfSide.Second:
+                                    GameInfo.Content += "\n第二方玩家";
+                                    break;
+                                case OfSide.Third:
+                                    GameInfo.Content += "\n第三方玩家";
+                                    break;
+                                case OfSide.Fourth:
+                                    GameInfo.Content += "\n第四方玩家";
+                                    break;
+                            }
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        GameInfo.Content += "\n???";
+                    }
                     gameStatus = GameStatus.Over;
                     break;
                 case "GameClose":
+                    gameInfo.CB.ClearAllChesses();
                     gameStatus = GameStatus.Closed;
                     break;
                 case "SideNext":
                     {
                         SideNext sideNext = (SideNext)netServerMsg.Data;
                         _onSideNext(sideNext);
-                    };break;
+                    };
+                    break;
                 case "PMove":
                     {
                         PMove pmove = (PMove)netServerMsg.Data;
                         gameInfo.CB.Move(pmove.SMInfo);
-                    };break;
+                    };
+                    break;
                 case "PSiLingDied":
                     PSiLingDied pSiLingDied=(PSiLingDied)netServerMsg.Data;
                     foreach (var cheinfo in pSiLingDied.chessInfo)
@@ -237,6 +329,24 @@ namespace UI
                         {
                             gameInfo.CB.VertexDataM[cheinfo.coord.i, cheinfo.coord.j].Chess = cheinfo.chess;
                         }
+                    }
+                    break;
+                case "PDie":
+                    {
+                        PDie pDie = (PDie)netServerMsg.Data;
+                        gameInfo.CB.ClearChessOf(pDie.Player.Side);
+                    }
+                    break;
+                case "PForceExit":
+                    {
+                        PForceExit pForceExit= (PForceExit)netServerMsg.Data;
+                        gameInfo.CB.ClearChessOf(pForceExit.PlayerInfo.Side);
+                    }
+                    break;
+                case "PSurr":
+                    {
+                        PSurr pSurr = (PSurr)netServerMsg.Data;
+                        gameInfo.CB.ClearChessOf(pSurr.PlayerInfo.Side);
                     }
                     break;
                 default:
@@ -289,7 +399,12 @@ namespace UI
             Grid.SetColumn(HasSecondTick_lable, viewCticklable.j);
             HasSecondTick_lable.Content = 30;
             hasSencond = 30;
-            Timer.Start();
+            HasSencondTimer.Start();
+            //激活当前窗口
+            if (sideNext.PlayerInfo.Side==myside&&!IsActive)
+            {
+                Activate();
+            }
         }
         private void CheckboardGrid_Loaded(object sender, RoutedEventArgs e)
         {
@@ -298,18 +413,18 @@ namespace UI
             
         }
         /// <summary>
-        /// 从UI坐标转换为游戏逻辑中的棋盘坐标。从UI上对棋子有关的操作都需经过此层转换.
+        /// 将棋盘坐标顺时针旋转为UI坐标。
         /// </summary>
-        /// <param name="c"></param>
-        /// <param name="viewSide"></param>
+        /// <param name="c">游戏逻辑中的棋盘坐标</param>
+        /// <param name="viewSide">当前所用视角</param>
         /// <returns></returns>
         /// <remarks>
         /// (ii,jj)为UI棋盘网格上的坐标,(i,j)为以棋盘坐标(8,8)为原点建立的坐标系中的点坐标
-        /// 逆时针旋转90度: (i,j)-> (x,y)=(j,-i).转换到棋盘坐标系中为(jj,-ii+16)
-        /// 逆时针旋转180即两次90旋转度: (i,j)-> (j,-i)-> (x,y)=(-i,-j) .最后(-ii+16,-jj+16)
-        /// 同上，270度为(jj,ii)
+        /// 顺时针旋转90度: (i,j)-> (x,y)=(j,-i).转换到棋盘坐标系中为(jj,-ii+16)
+        /// 顺时针旋转180即两次90旋转度: (i,j)-> (j,-i)-> (x,y)=(-i,-j) .最后(-ii+16,-jj+16)
+        /// 同上，270度为(-jj+16,ii)
         /// </remarks>
-        private static Coord _exhangeToRealC(Coord c, OfSide viewSide)
+        private static Coord _reverseToViewC(Coord c, OfSide viewSide)
         {
             Coord viewC = new Coord();
             switch (viewSide)
@@ -325,32 +440,32 @@ namespace UI
                     viewC.j = -c.j + 16;
                     break;
                 case OfSide.Fourth:
-                    viewC.i = c.j;
+                    viewC.i = -c.j+16;
                     viewC.j = c.i;
                     break;
             }
             return viewC;
         }
         /// <summary>
-        /// 从棋盘坐标转为UI坐标。
+        /// 将UI坐标逆时针转换为游戏逻辑中的棋盘坐标。从UI上对棋子有关的操作都需经过此层转换.
         /// </summary>
-        /// <param name="c"></param>
-        /// <param name="viewSide"></param>
+        /// <param name="c">UI坐标</param>
+        /// <param name="viewSide">当前所用视角</param>
         /// <returns></returns>
         /// <remark>
-        /// 与转为视角坐标唯一的不同在于它是顺时针的。
-        /// 同理,90度为: (i,j)-> (x,y)=(-j,i),(-jj+16,ii)
-        /// 180度:(-i,-j),最后(-ii+16,-jj+16)
+        /// 它是转为UI坐标的逆变(顺时针)。
+        /// 逆时针90度即顺时针270度为: (i,j)-> (x,y)=(-j,i),(-jj+16,ii)
+        /// 同理，180度:(-i,-j),最后(-ii+16,-jj+16)
         /// 270度 (j,-i),最后(jj,-ii+16)
         /// </remark>
-        private static Coord _reverseToViewC(Coord c, OfSide viewSide)
+        private static Coord _exhangeToRealC(Coord c, OfSide viewSide)
         {
             Coord realC = new Coord();
             switch (viewSide)
             {
                 case OfSide.First:
                     return c;
-                case OfSide.Second://转90度
+                case OfSide.Second://逆时针转90度
                     realC.i = -c.j+16;
                     realC.j = c.i;
                     break;
@@ -366,17 +481,17 @@ namespace UI
             return realC;
         }
         /// <summary>
-        /// 匹配到游戏后，开始预先放置棋子按钮、以“我方的视角”创建与游戏逻辑中的棋盘数据关联
+        /// 匹配到游戏后，开始预先放置棋子按钮、
         /// </summary>
-        private void CheckboardGrid_CreateChessAndSetBingding()
+        private void CheckboardGrid_CreateChess()
         {
-            Coord realC;//视角坐标
+            chessButton = new Button[17, 17];
             for (int i = 0; i < 17; i++)
             {
-                for (int j = 0; j < 17; j++)//遍历棋盘上的每一顶点
+                for (int j = 0; j < 17; j++)//遍历UI棋盘上的每一顶点
                 {
-                    //该UI坐标
-                    realC = _exhangeToRealC(new Coord(i, j), myside);
+                    if (CheckBroad.VertexInfoM[i, j].Type == VertexType.None)
+                        continue;
                     Button bt;
                     //预置棋子
                     bt = new Button()
@@ -385,23 +500,38 @@ namespace UI
                         FontWeight = FontWeights.Bold,
                         BorderThickness = new Thickness(0),
                         Cursor = Cursors.Hand,
+                        Opacity=0.0,
                     };
                     bt.Click += ChessButton_Click;//订阅事件
                     CheckboardGrid.Children.Add(bt);
 
                     Grid.SetRow(bt, i);
                     Grid.SetColumn(bt, j);
+                    chessButton[i, j] = bt;
+                }
+            }
+
+        }
+        /// <summary>
+        /// 以“我方的视角”创建与游戏逻辑中的棋盘数据关联
+        /// </summary>
+        private void CheckboardGrid_SetChessBingding()
+        {
+            for (int i = 0; i < 17; i++)
+            {
+                for (int j = 0; j < 17; j++)
+                {
+                    if (chessButton[i, j]==null)
+                    {
+                        continue;
+                    }
+                    //该UI坐标对应的实际坐标
+                    Coord realC = _exhangeToRealC(new Coord(i, j), myside);
                     //建立数据关联
                     Binding bChessName = new Binding("Chess")
                     {
                         Source = gameInfo.CB.VertexDataM[realC.i, realC.j],
                         Converter = new ChessTypeTOStringConverter(),
-                        Mode = BindingMode.OneWay
-                    };
-                    Binding bChessExist = new Binding("Chess")
-                    {
-                        Source = gameInfo.CB.VertexDataM[realC.i, realC.j],
-                        Converter = new ChessExitTODoubleConverter(),
                         Mode = BindingMode.OneWay
                     };
                     Binding bChessSide = new Binding("Chess")
@@ -410,20 +540,17 @@ namespace UI
                         Converter = new ChessSideTOBoolColor(),
                         Mode = BindingMode.OneWay
                     };
-                    Binding bChessIsMySide = new Binding("Chess")
+                    Binding bChessExist = new Binding("Chess")
                     {
                         Source = gameInfo.CB.VertexDataM[realC.i, realC.j],
-                        Converter = new ChessIsMySideTOBool(gameInfo.Mysideinfo.Side),
+                        Converter = new ChessExitTDoubleConverter(),
                         Mode = BindingMode.OneWay
-                    };
-                    bt.SetBinding(Button.ContentProperty, bChessName);
-                    bt.SetBinding(Button.OpacityProperty, bChessExist);
-                    bt.SetBinding(Button.BackgroundProperty, bChessSide);
-                    chessButton[i, j] = bt;
-                    //bt.SetBinding(Button.IsEnabledProperty, bChessIsMySide);
+                    }; 
+                    chessButton[i,j].SetBinding(Button.ContentProperty, bChessName);
+                    chessButton[i, j].SetBinding(Button.OpacityProperty, bChessExist);
+                    chessButton[i, j].SetBinding(Button.BackgroundProperty, bChessSide);
                 }
             }
-
         }
         //使用代码创建棋盘底座：为grid批量添加图形元素
         private void CheckboardGrid_Initialized(object sender, EventArgs e)
@@ -480,13 +607,10 @@ namespace UI
             LoginInfoLable.Content = string.Empty;
             if (GameTCP==null|| !GameTCP.TcpClient.Connected)
             {
+                GameTCP?.Close();
                 GameTCP = new GameTCPClient();
                 try
                 {
-                    //string ipandport = IPAndPortTextB.Text;
-                    //string[] s = ipandport.Split(':');
-                    //IPAddress ip = IPAddress.Parse(s[0]);
-                    //int port = Convert.ToInt32(s[1]);
                     if (ipAddress==default(IPAddress)&&port==default(int))
                     {
                         ipAddress = iPAddresses.Result[0];
@@ -494,6 +618,12 @@ namespace UI
                     }
                     GameTCP.StartUp(ipAddress, port);
                     GameTCP.NetMsgRev += _onMsgRecv;
+                    Action action = ()=>{
+                        LoginGrid.Visibility = Visibility.Visible;
+                    };
+                    GameTCP.ConnectClosed += (ssdenr, ee) => {
+                        Dispatcher.Invoke(action);
+                    };
                 }
                 catch (Exception exc)
                 {
@@ -503,7 +633,7 @@ namespace UI
             }
             LoginIn loginIn = new LoginIn()
             {
-                UserName = UsernameTextB.Text,
+                UserName = UserNameComboBox.Text,
                 Password = PasswordTextB.Password
             };
             GameTCP.SendAsync(loginIn);
@@ -511,8 +641,38 @@ namespace UI
 
         private void MatchButton_Click(object sender, RoutedEventArgs e)
         {
-            Match match = new Match() { GameMode = GameMode.Solo };
-            GameTCP.SendAsync(match);
+            switch ((bool)MatchButton.Tag)
+            {
+                case true://按的是“开始”匹配按钮
+                    {
+                        //设为取消匹配按钮
+                        MatchButton.Tag = false;
+                        MatchButton.Content = "取消匹配";
+                        //发送匹配请求
+                        GameMode mode = (GameMode)((ComboBoxItem)GameModeComBox.SelectedItem).Tag;
+                        Match match = new Match() { GameMode = mode };
+                        GameTCP.SendAsync(match);
+                        //定时器
+                        HasSecondTick_lable.Visibility = Visibility.Visible;
+                        HasSecondTick_lable.Content = 0;
+                        elapsedSencond = 0;
+                        ElapsedSencondTimer.Start();
+                        Grid.SetRow(HasSecondTick_lable, 0);
+                        Grid.SetColumn(HasSecondTick_lable, 11);
+                    }
+                    break;
+                case false://按的是取消匹配
+                    {
+                        //设为匹配按钮
+                        MatchButton.Tag = true;
+                        MatchButton.Content = "匹配";
+                        //发送取消匹配请求
+                        CancelMatch cancel = new CancelMatch() { };
+                        GameTCP.SendAsync(cancel);
+                    }
+                    break;
+            }
+            
         }
 
         private void ReadyButton_Click(object sender, RoutedEventArgs e)
@@ -523,6 +683,42 @@ namespace UI
                 CheLayout = CheckBroad.ConvertFromCheInfoToLayout(gameInfo.CB.GetCurrentChesses(myside))
             };
             GameTCP.SendAsync(ready);
+        }
+
+        private void EixtButton_Click(object sender, RoutedEventArgs e)
+        {
+            Exit exit = new Exit()
+            {
+                RoomID = roomid,
+                
+            };
+            GameTCP.SendAsync(exit);
+            gameInfo.CB.ClearAllChesses();
+            gameStatus = GameStatus.Closed;
+        }
+
+        private void SkipMoveButton_Click(object sender, RoutedEventArgs e)
+        {
+            Skip skip = new Skip()
+            {
+                RoomID = roomid,
+            };
+            GameTCP.SendAsync(skip);
+        }
+
+        private void LoginGrid_Initialized(object sender, EventArgs e)
+        {
+            UserNameComboBox.SelectionChanged +=(ssender,ee)=>{
+                if (ee.AddedItems.Count == 0)
+                {
+                    PasswordTextB.Password = string.Empty;
+                }
+                else
+                {
+                    ComboBoxItem item = (ComboBoxItem)(ee.AddedItems[0]);
+                    PasswordTextB.Password = (string)item.Tag;
+                }
+            };
         }
 
         private void ChessButton_Click(object sender, RoutedEventArgs e)
@@ -558,20 +754,23 @@ namespace UI
                             startC = new Coord(Grid.GetRow(b), Grid.GetColumn(b));
                             if (!gameInfo.CB.VertexDataM[startC.i, startC.j].ExistChess())
                                 return;
-                            clickedB = b;
+                            //判断此棋子是否可行走，并查找路径
+                            Coord[] allPathsC;
+                            try { allPathsC = gameInfo.CB.FindAllPaths(startC).ToArray(); }
+                            catch (GameRuleException) { return; }
                             //禁用除选中的我方棋子，开启可选路径
-                            ChessInfo[] chessInfos = gameInfo.CB.GetCurrentChesses(myside);
+                            ChessInfo[] chessInfos = gameInfo.CB.GetCurrentChesses(myside); 
                             foreach (var cheinfo in chessInfos)
                             {
                                 Coord viewC = _reverseToViewC( cheinfo.coord,myside);
                                 chessButton[viewC.i, viewC.j].IsEnabled = false;
                             }
-                            Coord[] coords= gameInfo.CB.FindAllPaths(startC).ToArray();
-                            foreach (var coord in coords)
+                            foreach (var coord in allPathsC)
                             {
                                 Coord viewC = _reverseToViewC(coord, myside);
                                 chessButton[viewC.i, viewC.j].IsEnabled = true;
                             }
+                            clickedB = b;//记录点选的棋子
                         }
                         else//有选中的棋子
                         {
@@ -586,7 +785,7 @@ namespace UI
                                 });
                                 foreach (var item in chessButton)
                                 {
-                                    item.IsEnabled = false;
+                                   if(item!=null) item.IsEnabled = false;
                                 }
                             }
                             else
@@ -594,7 +793,7 @@ namespace UI
                                 //关闭路径、开启我方棋子
                                 foreach (var item in chessButton)
                                 {
-                                    item.IsEnabled = false;
+                                    if(item!=null)item.IsEnabled = false;
                                 }
                                 ChessInfo[] chessInfos = gameInfo.CB.GetCurrentChesses(myside);
                                 foreach (var cheinfo in chessInfos)
@@ -617,29 +816,6 @@ namespace UI
             }
 
 
-        }
-    }
-    public class ChessIsMySideTOBool : IValueConverter
-    {
-        OfSide _side;
-        public ChessIsMySideTOBool(OfSide side)
-        {
-            _side = side;
-        }
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (value == null) return false;
-            OfSide s = ((Chess)value).Side;
-
-            if (s==_side)
-            {
-                return true;
-            }
-            else return false;
-        }
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            throw new NotImplementedException();
         }
     }
     [ValueConversion(typeof(ChessType), typeof(String))]
@@ -687,12 +863,12 @@ namespace UI
         }
     }
     
-    public class ChessExitTODoubleConverter : IValueConverter
+    public class ChessExitTDoubleConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             if (value == null) return 0.0;
-            else return 1.0;
+            else return 1.0; 
         }
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {

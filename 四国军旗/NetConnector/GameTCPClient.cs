@@ -41,7 +41,7 @@ namespace NetConnector
         public TcpClient TcpClient { get; set; }//获取或设置基础支持的TcpClient
 
 
-        Coder coder;
+        static Coder coder=new Coder(Role.Client);
         byte[] buffer = new byte[1024*100];//10kb缓存
         Int32 bufferDataLength = 0;//缓存中有效数据长度,以字节byte为单位
         static readonly Int32 mataDataLength = 4;//每个数据的开头32位（4字节byte）表示其承载的消息长度
@@ -58,7 +58,6 @@ namespace NetConnector
                 
             };
             //TcpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
-            coder = new Coder(Role.Client);
 
         }
         public void Close()
@@ -71,12 +70,20 @@ namespace NetConnector
             StartReadMsgAsync();
         }
         //包装TCPClient的异步发送任务。
-        public Task SendAsync(object data)
+        public void SendAsync(object data)
         {
             byte[] dataBuffer = coder.Encode(data);
             byte[] length = BitConverter.GetBytes((Int32)dataBuffer.Length);
             byte[] buffer = length.Concat(dataBuffer).ToArray();
-            return TcpClient.GetStream().WriteAsync(buffer,0,buffer.Length);
+            try
+            {
+                NetworkStream networkStream = TcpClient.GetStream();
+                networkStream.WriteAsync(buffer, 0, buffer.Length);
+            }
+            catch (Exception)
+            {
+                Close();
+            }
         }
 
         //不断地异步读取网络数据，解析成NetServerMsg对象通过事件通知。直到连接关闭，退出此任务。
@@ -95,6 +102,7 @@ namespace NetConnector
                     if (length == 0)
                     {
                         ConnectClosed?.Invoke(this, new Exception("从网络中读取信息错误：连接已关闭"));
+                        Close();
                         return;
                     }
 
@@ -143,6 +151,7 @@ namespace NetConnector
             {
                 bufferDataLength = 0;//"清空"缓冲区
                 ConnectClosed?.Invoke(this, e);
+                Close();
             }
             catch (System.IO.IOException e)
             {
@@ -150,12 +159,14 @@ namespace NetConnector
                 {
                     bufferDataLength = 0;//"清空"缓冲区
                     ConnectClosed?.Invoke(this, e);
+                    Close();
                 }
                 else throw e;
             }
             catch(InvalidOperationException e)
             {
                 ConnectClosed?.Invoke(this, e);
+                Close();
                 return;
             }
            

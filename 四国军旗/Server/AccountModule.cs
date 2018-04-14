@@ -19,10 +19,9 @@ namespace Server
         {
             if (_dataBaseAccess.AuthenAccount(data.UserName, data.Password, out ulong UID))
             {
-                Session presession = _connector.Sessions.Find((s) => { return s.UID == UID; });
+                Session presession = _connector.SearchSessionByUID(UID);
                 if (presession != default(Session))
-                    _connector.SendDataAsync(session, new ForceOffline() {Info="有玩家现在登陆了此帐号，密码可能已泄露，请尽快修改" });
-
+                    _connector.SendDataAsync(presession, new ForceOffline() {Info="有玩家现在登陆了此帐号，密码可能已泄露，请尽快修改" });
                 _connector.SessionBind(session, UID);
                 _connector.SendDataAsync(session, new LoginInfo() { IsLogin = true, PlayerID = UID, Info = "账号登录成功！" });
             }
@@ -30,14 +29,14 @@ namespace Server
         }
         private void _onLoginOut(Session session, LoginOut data)
         {
-            if (session.IsLogin)
+            if (session.IsLogin)//可注销
             {
-                _connector.SessionUnBind(session);
                 _connector.SendDataAsync(session,new LoginOutInfo() { IsLoginOut=true, Info ="注销成功"});
+                _connector.CloseSeesion(session);//会话关闭会导致更新匹配、房间信息
             }
             else
             {
-                _connector.SendDataAsync(session, new LoginOutInfo() { IsLoginOut = false, Info = "注销失败，还未登录" });
+                _connector.SendDataAsync(session, new GetquestError() { Code=101 , ErrorInfo = "注销失败，还未登录" });
             }
         }
 

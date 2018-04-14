@@ -155,7 +155,7 @@ namespace NetConnector
         /// 解码错误释放该TcpClient资源
         /// </summary>
         /// <param name="session"></param>
-        public async void StartReadMsgAsync(Session session)
+        private async void StartReadMsgAsync(Session session)
         {
             int bufferDataLength = 0;
             byte[] buffer = new byte[1024 * 5];
@@ -163,7 +163,6 @@ namespace NetConnector
             {
                 while (true)
                 {
-
                     NetworkStream networkStream = session.TcpClient.GetStream();
                     //此次从网络数据流中读取到的数据长度
                     int length = await networkStream.ReadAsync(buffer, bufferDataLength, buffer.Length - bufferDataLength);
@@ -309,7 +308,7 @@ namespace NetConnector
             session.UID = uid;
         }
         /// <summary>
-        /// 发送数据，解除绑定。
+        ///解除绑定。
         /// </summary>
         /// <param name="session"></param>
         /// <param name="data"></param>
@@ -317,33 +316,10 @@ namespace NetConnector
         {
             session.UID = 0;
         }
-
-
-        //异步发送消息
-        public async void SendAsync(TcpClient client, object data)
+        public Session SearchSessionByUID(ulong uid)
         {
-            try
-            {
-                using (NetworkStream n= client.GetStream())
-                {
-                    byte[] dataBuffer = coder.Encode(data);
-                    byte[] length = BitConverter.GetBytes((Int32)dataBuffer.Length);
-                    byte[] buffer = length.Concat(dataBuffer).ToArray();
-                    await n.WriteAsync(buffer, 0, buffer.Length);
-                }
-
-            }
-            catch (Newtonsoft.Json.JsonSerializationException e)
-            {
-                throw e;
-            }
-            catch(InvalidOperationException e)
-            {
-
-            }
-            
+            return Sessions.Find(item => item.UID == uid);
         }
-
  
     }
 }

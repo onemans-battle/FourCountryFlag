@@ -50,18 +50,18 @@ namespace GameClient
             GameTCPClient.StartUp(ip, port);
             Room.Cb.ChangeMode(mode);
         }
-        public Task Login(LoginIn loginIn)
-        {
-            return GameTCPClient.SendAsync(loginIn);
-        }
-        public Task Match(Match match)
-        {
-            return GameTCPClient.SendAsync(match);
-        }
-        public Task Move(Move move)
-        {
-            return GameTCPClient.SendAsync(move);
-        }
+        //public Task Login(LoginIn loginIn)
+        //{
+        //    return GameTCPClient.SendAsync(loginIn);
+        //}
+        //public Task Match(Match match)
+        //{
+        //    return GameTCPClient.SendAsync(match);
+        //}
+        //public Task Move(Move move)
+        //{
+        //    return GameTCPClient.SendAsync(move);
+        //}
         /// <summary>
         /// 处理服务器的响应或广播消息
         /// </summary>
