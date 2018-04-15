@@ -294,7 +294,7 @@ namespace GameLogic
 
         //事件
         //在方法体内直接激发的事件：
-        public event EventHandler<OfSide> PlayerEnter;                  //玩家进场：不会导致游戏进程变化，因此废弃
+        public event EventHandler<OfSide> PlayerEnter;                  //玩家进场
         public event EventHandler<OfSide> PlayerExit;                   //玩家退出
         public event EventHandler<PlayerForceExitEventArgs> PlayerForceExit;//玩家强制退出
         public event EventHandler<PlayerReadyEventArgs> PlayerReady;    //玩家准备
@@ -544,8 +544,8 @@ namespace GameLogic
                         ChessInfo[] ci = _checkbroad.ClearChessOf(side);//清理其所有棋子
                         PlayerForceExit?.Invoke(this, new PlayerForceExitEventArgs(Steps, side, ci));
                         _updateGameStatus();
-                        if (Status == GameStatus.Doing)//若游戏可继续
-                            _updateNextSide();//则轮到下一方行棋
+                        if (Status == GameStatus.Doing&&NowCanMoveSide==side)//若游戏可继续
+                            _updateNextSide();//则移交行棋权
                     }
                     else if(playerStatus==PlayerStatus.Eixted|| playerStatus == PlayerStatus.ForceEixted|| playerStatus==PlayerStatus.LostConnection)
                         throw new GameManagerException("玩家退出", "玩家已退出或掉线，无法正确完成此退出请求！");
@@ -758,7 +758,7 @@ namespace GameLogic
         }
 
         /// <summary>
-        /// 投降，更新玩家状态信息。
+        /// 投降，更新玩家状态信息。若正好此方有行棋权而游戏依然可以继续，则移交行棋权。
         /// 需满足条件：游戏进行中，且玩家属于此盘游戏并在游戏中
         /// </summary>
         /// <param name="side">投降方</param>
@@ -782,6 +782,10 @@ namespace GameLogic
             PlayerSurrender?.Invoke(this, new SurrenderEventArgs(Steps, side, ci));
             //PlayerDie?.Invoke(this, side); //投降非死亡，相同的是清理其所有在棋盘上的棋子
             _updateGameStatus();
+            if (Status==GameStatus.Doing&&NowCanMoveSide==side)
+            {
+                _updateNextSide();
+            }
         }
 
         /* 8.请求和棋。玩家在游戏进行中在某步提出和棋请求，不需征求失败或退出的玩家，只征求在游戏中的玩家
@@ -929,7 +933,6 @@ namespace GameLogic
         /// 根据当前游戏的模式和查看布阵图的势力方，过滤AllChesesLaout变量中的布阵图
         /// 默认参数都合法
         /// </summary>
-        /// <param name="ci"></param>
         /// <param name="viewSide"></param>
         public Dictionary<OfSide, int[,]> AllLayoutFliter( OfSide viewSide)
         {
@@ -1210,38 +1213,41 @@ namespace GameLogic
         {
             lock (thielock)
             {
-                if (Steps == 0) NowCanMoveSide = _playerMoveOrder[0];//游戏刚开始的第一步行棋方
+                OfSide[] nextsideOrder ;
+                if (NowCanMoveSide == default(OfSide))//若是游戏开始后第一次设置行棋方
+                {
+                    nextsideOrder = new OfSide[_playerMoveOrder.Length];
+                    _playerMoveOrder.CopyTo(nextsideOrder, 0);
+                }
                 else
                 {
-                    int index = 0;
-                    for (; index < _playerMoveOrder.Length; index++)
+                //根据当前的行棋方与游戏规则的行棋顺序创建当前的行棋顺序变量nextsideOrder。玩家不可能出现连续行棋的情况
+                    nextsideOrder = new OfSide[_playerMoveOrder.Length - 1];
+                    //确定索引
+                    int index = Array.IndexOf(_playerMoveOrder, NowCanMoveSide);
+                    if (index == -1)
+                        throw new GameManagerCodeException("GameManager._updateNextSide()", "在行棋顺序变量_playerMoveOrder中查找不到当前行棋方所在的索引");
+                    //开始拷贝
+                    for (int i = 0; i < nextsideOrder.Length; i++)
                     {
-                        if (_playerMoveOrder[index] == NowCanMoveSide)//找到当前行棋方所在的顺序索引
-                            break;
+                        if (++index == _playerMoveOrder.Length) index = 0;
+                        nextsideOrder[i] = _playerMoveOrder[index];
                     }
-                    //从索引往后“轮回”式查找
-                    OfSide nextside;
-                    int nextsideIndex;
-                    if (index == _playerMoveOrder.Length - 1)//找到的是尾部的索引
-                        nextsideIndex = 0;
-                    else nextsideIndex = index + 1;
-                    for (int i = 0; i < _playerMoveOrder.Length - 1; i++)
-                    {
-                        nextside = _playerMoveOrder[nextsideIndex];
-                        if (_PlayersInfo.TryGetValue(nextside, out SideInfo playerInfo))
-                        {
-                            if (playerInfo.Status == PlayerStatus.Alive)//下一玩家可行棋
-                            {
-                                NowCanMoveSide = nextside;
-                                return;
-                            }
-                        }
-                        if (nextsideIndex == _playerMoveOrder.Length - 1)//走到头了吗
-                            nextsideIndex = 0;
-                        else nextsideIndex++;
-                    }
-                    throw new GameManagerCodeException("GameManager._updateNextSide()", "找不到下一应行棋方");
                 }
+               
+                //设置下一行棋方
+                foreach (var nextside in nextsideOrder)
+                {
+                    if (_PlayersInfo.TryGetValue(nextside, out SideInfo playerInfo))//二人游戏会出现找不到的情况
+                    {
+                        if (playerInfo.Status == PlayerStatus.Alive)//下一玩家可行棋
+                        {
+                            NowCanMoveSide = nextside;
+                            return;
+                        }
+                    }
+                }
+                throw new GameManagerCodeException("GameManager._updateNextSide()", "找不到下一行棋方：没有玩家存活或者出现了玩家行棋两次的情况");
             }
         }
 

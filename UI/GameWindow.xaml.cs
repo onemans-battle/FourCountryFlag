@@ -33,6 +33,7 @@ namespace UI
         public class Game
         {
             public GameStatus GameStatus;
+            public GameMode Mode;
             public ushort Step;
             public SideInfo Mysideinfo;
             public CheckBroad CB;
@@ -210,6 +211,16 @@ namespace UI
                         LoginInfoLable.Content = forceOffline.Info;
                         gameStatus = GameStatus.Closed;
                         LoginGrid.Visibility = Visibility.Visible;
+                        SurrenderButton.IsEnabled = false;
+                        OfferDrawButton.IsEnabled = false;
+                        ReadyButton.IsEnabled = false;
+                        SkipMoveButton.IsEnabled = false;
+                        EixtButton.IsEnabled = false;
+                        MatchButton.Tag = true;
+                        MatchButton.Content = "匹配";
+                        gameInfo?.CB?.ClearAllChesses();
+                        HasSencondTimer.Stop();
+                        ElapsedSencondTimer.Stop();
                     }
                     break;
                 case "PReady":
@@ -227,13 +238,18 @@ namespace UI
                     break;
                 case "MatchInfo":
                     {
+                        //记录匹配的信息
                         MatchInfo matchInfo = (MatchInfo)netServerMsg.Data;
                         if (matchInfo.HasAGame)
                         {
                             HasSecondTick_lable.Visibility = Visibility.Hidden;
-                            gameInfo.CB = new CheckBroad(matchInfo.GameMode);
+                            ElapsedSencondTimer.Stop();
                             MatchButton.IsEnabled = false;
+                            MatchButton.Content = "匹配";
+                            MatchButton.Tag = true;
                             roomid = matchInfo.RoomID;
+                            gameInfo.Mode = matchInfo.GameMode;
+                            gameInfo.CB = new CheckBroad(gameInfo.Mode);
                             foreach (var info in matchInfo.PlayerInfo)
                             {
                                 if (info.UID==myuid)
@@ -243,20 +259,20 @@ namespace UI
                                     break;
                                 }
                             }
-                            ChessInfo[] chessInfos = CheckBroad.ConvertFromLayoutToCheInfo(CheckBroad.GetDefaultLayout(), myside);
-                            gameInfo.CB.Layout(chessInfos);
                         }
                         else if (matchInfo.HasCancel)//匹配被服务器取消
                         {
+                            HasSecondTick_lable.Content = string.Empty;
+                            MatchButton.Tag = true;
+                            MatchButton.Content = "匹配";
+                            ElapsedSencondTimer.Stop();
                         }
-                        HasSecondTick_lable.Content = string .Empty;
-                        MatchButton.Tag = true;
-                        MatchButton.Content = "匹配";
-                        ElapsedSencondTimer.Stop();
                     }; break;
                 case "GameLayouting":
                     {
                         GameLayouting gameLayouting=(GameLayouting)netServerMsg.Data;
+                        ChessInfo[] chessInfos = CheckBroad.ConvertFromLayoutToCheInfo(CheckBroad.GetDefaultLayout(), myside);
+                        gameInfo.CB.Layout(chessInfos);
                         gameStatus = GameStatus.Layouting;
                     }
                     break;
@@ -285,16 +301,16 @@ namespace UI
                             switch (item)
                             {
                                 case OfSide.First:
-                                    GameInfo.Content += "\n第一方玩家";
+                                    GameInfo.Content += "\n红色方";
                                     break;
                                 case OfSide.Second:
-                                    GameInfo.Content += "\n第二方玩家";
+                                    GameInfo.Content += "\n蓝色方";
                                     break;
                                 case OfSide.Third:
-                                    GameInfo.Content += "\n第三方玩家";
+                                    GameInfo.Content += "\n绿色方";
                                     break;
                                 case OfSide.Fourth:
-                                    GameInfo.Content += "\n第四方玩家";
+                                    GameInfo.Content += "\n色色方";
                                     break;
                             }
                         }
@@ -353,6 +369,7 @@ namespace UI
                     break;
             }
             NetMsgTextBlock.Text += "  "+netServerMsg.MsgType.Name;
+            NetMsgScrollViewer.ScrollToEnd();
         }
 
         private void _onSideNext(SideNext sideNext)
@@ -360,6 +377,7 @@ namespace UI
             ChessInfo[] chessInfos = gameInfo.CB.GetCurrentChesses(myside);
             if (sideNext.PlayerInfo.Side == myside)
             {
+                clickedB = null;
                 //开启我方棋子
                 foreach (var cheinfo in chessInfos)
                 {
@@ -495,12 +513,13 @@ namespace UI
                     Button bt;
                     //预置棋子
                     bt = new Button()
-                    { Style = (Style)FindResource("UnableChessButton"),
+                    { Style = (Style)FindResource("chessButtonTemplate"),
                         Margin = new Thickness(5),
                         FontWeight = FontWeights.Bold,
                         BorderThickness = new Thickness(0),
                         Cursor = Cursors.Hand,
-                        Opacity=0.0,
+                        Opacity = 0.0,
+                        IsEnabled = false,
                     };
                     bt.Click += ChessButton_Click;//订阅事件
                     CheckboardGrid.Children.Add(bt);
@@ -886,14 +905,14 @@ namespace UI
             OfSide side = ((Chess)value).Side;
             switch (side)
             {
-                case OfSide.First:return Brushes.MediumVioletRed;
+                case OfSide.First:return new SolidColorBrush(Color.FromRgb(0xFF, 0x74, 0x74));//红色
 
-                case OfSide.Second: return Brushes.BlueViolet;
+                case OfSide.Second: return new SolidColorBrush(Color.FromRgb(0x74, 0xAF, 0xFF));//蓝色
 
                 case OfSide.Third: return Brushes.MediumSeaGreen;
 
-                case OfSide.Fourth: return Brushes.WhiteSmoke;
-                    
+                case OfSide.Fourth: return new SolidColorBrush(Color.FromRgb(0xBC, 0x74, 0xFF));//紫色BC74FF
+
             }
             return Brushes.WhiteSmoke;
 

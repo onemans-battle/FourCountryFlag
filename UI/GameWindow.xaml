@@ -6,9 +6,8 @@
         xmlns:g="clr-namespace:GameLogic;assembly=FourCountryFlag"
         xmlns:local="clr-namespace:UI"
         mc:Ignorable="d"
-        Title="四国军旗" Background="#FF616161" WindowStartupLocation="CenterScreen" UseLayoutRounding="True" MinWidth="600" MinHeight="600">
+        Title="四国军旗" Background="#FFDFDFDF" WindowStartupLocation="CenterScreen" UseLayoutRounding="True" MinWidth="600" MinHeight="600">
     <Window.Resources>
-
         <Style x:Key="行营" TargetType="{x:Type Rectangle }" >
             <Setter Property="RadiusX" Value="10.833"/>
             <Setter Property="RadiusY" Value="10.833"/>
@@ -27,17 +26,66 @@
         <Style x:Key="大本营" TargetType="{x:Type Rectangle}">
             <Setter Property="Stroke" Value="Silver"/>
         </Style>
-        <Style x:Key="UnableChessButton" TargetType="{x:Type Button}">
-            <Style.Triggers>
-                <Trigger Property="IsEnabled" Value="false">
-                    <Setter Property="Background" Value="{x:Null}"></Setter>
-                </Trigger>
-            </Style.Triggers>
+
+        <Style x:Key="FocusVisual">
+            <Setter Property="Control.Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Rectangle Margin="2" SnapsToDevicePixels="true" Stroke="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" StrokeThickness="1" StrokeDashArray="1 2"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
+        <SolidColorBrush x:Key="Button.Static.Background" Color="#FFDDDDDD"/>
+        <SolidColorBrush x:Key="Button.Static.Border" Color="#FF707070"/>
+        <SolidColorBrush x:Key="Button.MouseOver.Border" Color="#FF3C7FB1"/>
+        <SolidColorBrush x:Key="Button.Pressed.Background" Color="#FFC4E5F6"/>
+        <SolidColorBrush x:Key="Button.Pressed.Border" Color="#FFFCB943"/>
+        <SolidColorBrush x:Key="Button.Disabled.Border" Color="#FFADB2B5"/>
+        <Style x:Key="chessButtonTemplate" TargetType="{x:Type Button}">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
+            <Setter Property="Background" Value="{StaticResource Button.Static.Background}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Button.Static.Border}"/>
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" SnapsToDevicePixels="true" >
+                            <ContentPresenter x:Name="contentPresenter" Focusable="False" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" Margin="{TemplateBinding Padding}" RecognizesAccessKey="True" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsDefaulted" Value="true">
+                                <Setter Property="BorderBrush" TargetName="border" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="true">
+                                <Setter Property="Opacity" TargetName="border" Value="0.95"/>
+                                <Setter Property="BorderBrush" TargetName="border" Value="{StaticResource Button.MouseOver.Border}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="true">
+                                <!--<Setter Property="BorderBrush" TargetName="border" Value="{StaticResource Button.Pressed.Border}"/>-->
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="false">
+                                <Setter Property="Opacity" TargetName="border" Value="0.7"/>
+                                <Setter Property="BorderBrush" TargetName="border" Value="{StaticResource Button.Disabled.Border}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+
     </Window.Resources>
+
     <Grid UseLayoutRounding="True" x:Name="Room">
         <Label x:Name="GameInfo" Content="四国军旗" FontSize="16" />
-        <TextBlock x:Name="NetMsgTextBlock" HorizontalAlignment="Left" Margin="10,94,0,0" TextWrapping="Wrap" Text="接收到的网络消息：" VerticalAlignment="Top" Height="411" Width="182" FontSize="14" ScrollViewer.CanContentScroll="True" ScrollViewer.HorizontalScrollBarVisibility="Visible"/>
+        <ScrollViewer x:Name="NetMsgScrollViewer" Margin="10,94,0,0" Height="411" Width="148" HorizontalAlignment="Left" VerticalAlignment="Top" VerticalScrollBarVisibility="Hidden" CanContentScroll="True">
+            <TextBlock x:Name="NetMsgTextBlock" HorizontalAlignment="Left" TextWrapping="Wrap" Text="接收到的网络消息：" VerticalAlignment="Top"  FontSize="14"/>
+        </ScrollViewer>
 
         <Viewbox>
             <Grid  x:Name="CheckboardGrid" Margin="6" Initialized="CheckboardGrid_Initialized" MinWidth="730" MinHeight="600">
@@ -123,7 +171,6 @@
                     <ComboBoxItem Content="HelloWorld" Foreground="#FF7E7E7E" Tag="HelloWorld"/>
                     <ComboBoxItem Content="Teacher" Foreground="Black" Tag="Teacher"/>
                 </ComboBox>
-                <!--<TextBox x:Name="UsernameTextB" Grid.Row="1" Grid.ColumnSpan="4" Grid.Column="1" Text="Student" HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="150" MinHeight="30" TextAlignment="Center" FontSize="16" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" HorizontalScrollBarVisibility="Disabled" MaxLines="1"/>-->
                 <PasswordBox x:Name="PasswordTextB" Password="Student" Grid.Row="2" Grid.ColumnSpan="4" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="150" MinHeight="30" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" MaxLength="20" AutomationProperties.HelpText="password"/>
                 <Button  x:Name="LoginButton" Content="登录" Grid.Row="3" Grid.ColumnSpan="4" Grid.Column="1" Click="LoginButton_Click" MinWidth="100" MinHeight="30" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 <Label x:Name="LoginInfoLable"   FontSize="16" Grid.Row="4" Grid.ColumnSpan="4" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" MinWidth="150" MinHeight="30"/>
@@ -187,4 +234,7 @@
         </Viewbox>-->
 
     </Grid>
+
+
+
 </Window>
