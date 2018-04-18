@@ -78,7 +78,7 @@ namespace DataStruct
 
         }
         /// <summary>
-        /// 输出所有节点的数据；包括根节点
+        /// 输出所有节点的数据；包括根节点(在索引0位置)
         /// </summary>
         /// <returns></returns>
         public DT[] ToArray()

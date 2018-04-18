@@ -670,7 +670,7 @@ namespace GameLogic
                         }
                     case ChessType.DiLei://棋子是地雷,
                         {
-                            if (VertexInfoM[c.i, c.j].Place == Place.Fourth  //在最后两线
+                            if (VertexInfoM[c.i, c.j].Place == Place.Fifth  //在最后两线
                                || VertexInfoM[c.i, c.j].Place == Place.Sixth)
                                 return true;
                             else return false;

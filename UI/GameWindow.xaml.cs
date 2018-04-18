@@ -139,8 +139,8 @@ namespace UI
             get { return _myside; }
         }//我方势力、我方视角点
         OfSide _myside;
-        Button[,] chessButton;
-
+        Button[,] chessButton;//以UI坐标为索引的数组
+        Coord[] allPathsC;//真实棋盘的坐标集合
         System.Timers.Timer HasSencondTimer = new System.Timers.Timer(1000) { AutoReset=true};
         System.Timers.Timer ElapsedSencondTimer = new System.Timers.Timer(1000) { AutoReset = true };
         Action actionHasSencond;
@@ -283,6 +283,8 @@ namespace UI
                             LoginGrid.Visibility = Visibility.Visible;
                     };break;
                 case "GameStart":
+                    if (clickedB!=null)
+                        clickedB.BorderBrush = (SolidColorBrush)FindResource("Button.Static.Border");
                     GameStart gameStart= (GameStart)netServerMsg.Data;
                     foreach (var layout in gameStart.LayoutDic)
                     {
@@ -335,6 +337,14 @@ namespace UI
                     {
                         PMove pmove = (PMove)netServerMsg.Data;
                         gameInfo.CB.Move(pmove.SMInfo);
+                        //取消选中棋子，关闭其路径
+                        if (clickedB != null)
+                        {
+                            _closeVertex();
+                            clickedB.BorderBrush = (SolidColorBrush)FindResource("Button.Static.Border");
+                            clickedB.IsEnabled = false;
+                            clickedB = null;
+                        }
                     };
                     break;
                 case "PSiLingDied":
@@ -377,7 +387,6 @@ namespace UI
             ChessInfo[] chessInfos = gameInfo.CB.GetCurrentChesses(myside);
             if (sideNext.PlayerInfo.Side == myside)
             {
-                clickedB = null;
                 //开启我方棋子
                 foreach (var cheinfo in chessInfos)
                 {
@@ -514,9 +523,9 @@ namespace UI
                     //预置棋子
                     bt = new Button()
                     { Style = (Style)FindResource("chessButtonTemplate"),
-                        Margin = new Thickness(5),
+                        Margin = new Thickness(4),
                         FontWeight = FontWeights.Bold,
-                        BorderThickness = new Thickness(0),
+                        BorderThickness = new Thickness(1),
                         Cursor = Cursors.Hand,
                         Opacity = 0.0,
                         IsEnabled = false,
@@ -754,6 +763,7 @@ namespace UI
                             if (!gameInfo.CB.VertexDataM[startC.i, startC.j].ExistChess())
                                 return;
                             clickedB = b;
+                            clickedB.BorderBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x6F, 0x1D));
                         }
                         else 
                         {
@@ -762,67 +772,53 @@ namespace UI
                                 endC = new Coord(Grid.GetRow(b), Grid.GetColumn(b));
                                 gameInfo.CB.ExchangeChess(startC,endC);
                             }
+                            clickedB.BorderBrush = (SolidColorBrush)FindResource("Button.Static.Border");
                             clickedB = null;
                         }
                     }
                     break;
                 case GameStatus.Doing:
                     {
-                        if (clickedB == null)//无选中的棋子
+                        if (clickedB == null)//先前无选中的棋子
                         {
                             startC = new Coord(Grid.GetRow(b), Grid.GetColumn(b));
                             if (!gameInfo.CB.VertexDataM[startC.i, startC.j].ExistChess())
                                 return;
                             //判断此棋子是否可行走，并查找路径
-                            Coord[] allPathsC;
-                            try { allPathsC = gameInfo.CB.FindAllPaths(startC).ToArray(); }
+                            Coord[] coords;
+                            try { coords = gameInfo.CB.FindAllPaths(startC).ToArray(); }
                             catch (GameRuleException) { return; }
-                            //禁用除选中的我方棋子，开启可选路径
-                            ChessInfo[] chessInfos = gameInfo.CB.GetCurrentChesses(myside); 
-                            foreach (var cheinfo in chessInfos)
-                            {
-                                Coord viewC = _reverseToViewC( cheinfo.coord,myside);
-                                chessButton[viewC.i, viewC.j].IsEnabled = false;
-                            }
-                            foreach (var coord in allPathsC)
-                            {
-                                Coord viewC = _reverseToViewC(coord, myside);
-                                chessButton[viewC.i, viewC.j].IsEnabled = true;
-                            }
+                            allPathsC = new Coord[coords.Length-1];
+                            Array.Copy(coords, 1, allPathsC, 0, allPathsC.Length);
+                            //开启可选路径
+                            _openVertex();
+
                             clickedB = b;//记录点选的棋子
+                            clickedB.BorderBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x6F, 0x1D));
                         }
-                        else//有选中的棋子
+                        else//先前有选中的棋子
                         {
-                            if (clickedB != b)//选中的是其他棋子或顶点
+                            endC = new Coord(Grid.GetRow(b), Grid.GetColumn(b));
+                            if (allPathsC.Contains(endC))//且选中的是可行走到的顶点
                             {
-                                endC = new Coord(Grid.GetRow(b), Grid.GetColumn(b));
                                 GameTCP.SendAsync(new Move()
                                 {
                                     RoomID = roomid,
                                     ChessCoord = startC,
                                     TargetCoord = endC
                                 });
-                                foreach (var item in chessButton)
-                                {
-                                   if(item!=null) item.IsEnabled = false;
-                                }
+                                return;
                             }
-                            else
+                            else if(clickedB==b)
                             {
-                                //关闭路径、开启我方棋子
-                                foreach (var item in chessButton)
-                                {
-                                    if(item!=null)item.IsEnabled = false;
-                                }
-                                ChessInfo[] chessInfos = gameInfo.CB.GetCurrentChesses(myside);
-                                foreach (var cheinfo in chessInfos)
-                                {
-                                    Coord viewC = _reverseToViewC( cheinfo.coord,myside);
-                                    chessButton[viewC.i, viewC.j].IsEnabled = true;
-                                }
+                                return;
                             }
+                            //至此，玩家是要换选棋子
+                            //关闭刚才的路径、开启新的棋子
+                            _closeVertex();
+                            clickedB.BorderBrush = (SolidColorBrush)FindResource("Button.Static.Border");
                             clickedB = null;
-                           
+                            ChessButton_Click(sender, e);
                         }
                     }
                     break;
@@ -835,6 +831,23 @@ namespace UI
             }
 
 
+        }
+
+        private void _openVertex()
+        {
+            foreach (var coord in allPathsC)
+            {
+                Coord viewC = _reverseToViewC(coord,myside);
+                chessButton[viewC.i, viewC.j].IsEnabled = true;
+            }
+        }
+        private void _closeVertex()
+        {
+            foreach (var coord in allPathsC)
+            {
+                Coord viewC = _reverseToViewC(coord, myside);
+                chessButton[viewC.i, viewC.j].IsEnabled = false;
+            }
         }
     }
     [ValueConversion(typeof(ChessType), typeof(String))]
